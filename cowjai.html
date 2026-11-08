@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跑安拉溝仔助手 by醉愛蘿莉v3v</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tesseract.js v5 for Chinese OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '"Noto Sans TC"', '"Microsoft JhengHei"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 自訂捲軸與互動樣式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .canvas-container {
+            position: relative;
+            user-select: none;
+            overflow: hidden;
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(16, 185, 129, 0.8); box-shadow: 0 0 15px rgba(16, 185, 129, 0.25); }
+            50% { border-color: rgba(52, 211, 153, 1); box-shadow: 0 0 25px rgba(16, 185, 129, 0.5); }
+        }
+        .hero-match-card {
+            animation: pulse-border 3s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+
+    <!-- 頂部導覽列 -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="scan-text" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-emerald-400 bg-clip-text text-transparent">
+                        跑安拉溝仔助手 by醉愛蘿莉v3v
+                    </h1>
+                    <p class="text-xs text-slate-400">即時視窗框選擷取 · 繁中 OCR 辨識 · 智慧模糊對比最佳回答</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span id="dbCountBadge" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium text-emerald-400 flex items-center gap-1.5">
+                    <i data-lucide="database" class="w-3.5 h-3.5"></i>
+                    <span>題庫載入中...</span>
+                </span>
+                <button id="openDbModalBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition flex items-center gap-1.5">
+                    <i data-lucide="table-properties" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span>檢視 / 匯入題庫</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容雙欄佈局 -->
+    <main class="max-w-[1600px] w-full mx-auto px-4 py-5 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 左欄：視窗畫面擷取、方框範圍選擇與 OCR 控制 (佔 7 欄) -->
+        <section class="lg:col-span-7 flex flex-col gap-4">
+            
+            <!-- 步驟 1：畫面來源選擇列 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center border border-emerald-500/30">1</span>
+                        <h2 class="font-semibold text-sm md:text-base text-slate-200">選擇畫面來源並拖曳紅框圈選「NPC 問題區域」</h2>
+                    </div>
+                    <div class="text-xs text-slate-400 flex items-center gap-1">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-sky-400"></i>
+                        <span>支援直接 <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">Ctrl+V</kbd> 貼上截圖</span>
+                    </div>
+                </div>
+
+                <!-- 來源按鈕組 -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <button id="startCaptureBtn" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm shadow-lg shadow-emerald-600/20 transition flex items-center gap-2">
+                        <i data-lucide="monitor" class="w-4 h-4"></i>
+                        <span>選擇遊戲視窗 / 螢幕畫面</span>
+                    </button>
+
+                    <button id="stopCaptureBtn" class="hidden px-3.5 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 font-medium text-sm transition flex items-center gap-1.5">
+                        <i data-lucide="square" class="w-4 h-4"></i>
+                        <span>停止串流</span>
+                    </button>
+
+                    <label class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-sm cursor-pointer transition flex items-center gap-2">
+                        <i data-lucide="image-plus" class="w-4 h-4 text-sky-400"></i>
+                        <span>上傳截圖</span>
+                        <input type="file" id="uploadImageInput" accept="image/*" class="hidden">
+                    </label>
+
+                    <button id="loadDemoBtn" class="px-3.5 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-medium text-sm transition flex items-center gap-2 ml-auto">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+                        <span>載入測試範例畫面 (隨機題目)</span>
+                    </button>
+                </div>
+
+                <!-- 畫面與互動框選區 -->
+                <div id="workspaceContainer" class="canvas-container mt-4 w-full h-[360px] sm:h-[440px] bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center relative">
+                    <!-- 隱藏的原始 Video 元素 -->
+                    <video id="captureVideo" autoplay playsinline muted class="hidden"></video>
+                    
+                    <!-- 主畫面繪製 Canvas 與 ROI 互動層 Canvas -->
+                    <canvas id="sourceCanvas" class="max-w-full max-h-full object-contain"></canvas>
+                    <canvas id="overlayCanvas" class="absolute inset-0 cursor-crosshair"></canvas>
+
+                    <!-- 尚未載入畫面時的引導提示 -->
+                    <div id="emptyWorkspaceHint" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center pointer-events-none">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 text-slate-500">
+                            <i data-lucide="crop" class="w-8 h-8"></i>
+                        </div>
+                        <p class="text-slate-300 font-medium mb-1">尚未選擇視窗畫面或圖片</p>
+                        <p class="text-xs text-slate-500 max-w-md">
+                            請點擊上方「選擇遊戲視窗 / 螢幕畫面」串流遊戲視窗，或點擊「載入測試範例畫面」立即體驗框選與自動文字辨識功能。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 框選座標與快速重設提示 -->
+                <div class="mt-2.5 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-400"></span>
+                        <span id="roiStatusText">提示：在畫面上按住滑鼠左鍵拖曳，即可框選要辨識的對話文字方框範圍。</span>
+                    </div>
+                    <button id="selectFullRoiBtn" class="text-sky-400 hover:text-sky-300 underline">全選畫面範圍</button>
+                </div>
+            </div>
+
+            <!-- 步驟 2：擷取範圍預覽、影像強化與 OCR 辨識控制 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center justify-center border border-emerald-500/30">2</span>
+                        <h2 class="font-semibold text-sm md:text-base text-slate-200">方框範圍即時預覽與中文 OCR 辨識設定</h2>
+                    </div>
+
+                    <!-- OCR 狀態進度標籤 -->
+                    <div id="ocrStatusBadge" class="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center gap-2 border border-slate-700">
+                        <span id="ocrStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span id="ocrStatusText">OCR 引擎待命中</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                    <!-- 左側：擷取方框預覽 Canvas -->
+                    <div class="md:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col items-center justify-center min-h-[120px] relative">
+                        <span class="text-[11px] text-slate-400 self-start mb-1 px-1 flex items-center justify-between w-full">
+                            <span>方框擷取預覽 (送入 OCR 影像)</span>
+                            <span id="roiDimensionsBadge" class="text-slate-500 font-mono">-- x --</span>
+                        </span>
+                        <div class="w-full h-24 flex items-center justify-center overflow-hidden bg-slate-900/60 rounded-lg border border-slate-800/80">
+                            <canvas id="roiPreviewCanvas" class="max-w-full max-h-full object-contain"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 右側：影像前處理與辨識按鈕 -->
+                    <div class="md:col-span-7 flex flex-col gap-3">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <!-- 辨識語言 -->
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">辨識語系</label>
+                                <select id="ocrLangSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                                    <option value="chi_tra" selected>繁體中文 (chi_tra)</option>
+                                    <option value="chi_tra+eng">繁中 + 英文</option>
+                                    <option value="chi_sim">簡體中文 (chi_sim)</option>
+                                </select>
+                            </div>
+
+                            <!-- 影像濾鏡 (提升遊戲對話框辨識率) -->
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">影像強化濾鏡</label>
+                                <select id="imageFilterSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                                    <option value="none">原圖色彩 (預設)</option>
+                                    <option value="grayscale">灰階高對比 (適合淺底黑字)</option>
+                                    <option value="invert">反相高對比 (適合深底白字)</option>
+                                    <option value="binary">二值化黑白分明</option>
+                                </select>
+                            </div>
+
+                            <!-- 二值化/對比閾值 -->
+                            <div class="col-span-2 sm:col-span-1">
+                                <label class="block text-[11px] text-slate-400 mb-1 flex justify-between">
+                                    <span>對比閾值</span>
+                                    <span id="thresholdValLabel" class="font-mono text-emerald-400">145</span>
+                                </label>
+                                <input type="range" id="thresholdSlider" min="60" max="220" value="145" class="w-full accent-emerald-500 mt-1">
+                            </div>
+                        </div>
+
+                        <!-- 進度條 -->
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div id="ocrProgressBar" class="bg-emerald-500 h-full w-0 transition-all duration-200"></div>
+                        </div>
+
+                        <!-- 執行辨識與自動連續辨識 -->
+                        <div class="flex flex-wrap items-center gap-2.5 pt-1">
+                            <button id="runOcrBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                <i data-lucide="scan-line" class="w-4 h-4"></i>
+                                <span>立即辨識框選畫面 (空白鍵)</span>
+                            </button>
+
+                            <label class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 cursor-pointer flex items-center gap-2 text-xs font-medium text-slate-200 select-none">
+                                <input type="checkbox" id="autoOcrToggle" class="w-4 h-4 accent-emerald-500 rounded">
+                                <span>每 2.5 秒自動辨識</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右欄：最佳選項大字報、OCR 結果微調與 Top 5 相似候選 (佔 5 欄) -->
+        <section class="lg:col-span-5 flex flex-col gap-4">
+
+            <!-- 最佳選項 Hero Card -->
+            <div id="heroMatchCard" class="bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border-2 border-emerald-500/70 rounded-2xl p-5 shadow-2xl hero-match-card relative overflow-hidden">
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold tracking-wide flex items-center gap-1">
+                            <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                            最佳選項推薦
+                        </span>
+                        <span id="bestMatchNumBadge" class="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-300 text-xs font-mono">
+                            Num: ----
+                        </span>
+                    </div>
+                    <span id="bestMatchScoreBadge" class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+                        相似度 --%
+                    </span>
+                </div>
+
+                <!-- 對比到的題庫問題 -->
+                <div class="mb-4">
+                    <div class="text-xs text-slate-400 mb-1">對應 NPC 問題：</div>
+                    <p id="bestMatchQuestion" class="text-sm sm:text-base text-slate-200 bg-slate-950/70 border border-slate-800 rounded-xl p-3 leading-relaxed">
+                        請在左側框選遊戲對話畫面並點擊「立即辨識」，或直接在下方輸入文字查詢。
+                    </p>
+                </div>
+
+                <!-- 最佳選項高亮區 (支援同一題有多個最佳選項，如 6836) -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                            請選擇此最佳回答：
+                        </span>
+                        <button id="copyBestOptionBtn" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            <span id="copyBtnText">複製選項</span>
+                        </button>
+                    </div>
+                    <div id="bestMatchAnswerContainer" class="bg-emerald-950/60 border border-emerald-500/50 rounded-xl p-4 text-xl sm:text-2xl font-extrabold text-emerald-300 tracking-wide shadow-inner break-words">
+                        等待辨識或輸入...
+                    </div>
+                </div>
+            </div>
+
+            <!-- OCR 辨識結果與手動快速檢索框 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-2">
+                    <label for="ocrResultInput" class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                        <i data-lucide="text-cursor-input" class="w-4 h-4 text-emerald-400"></i>
+                        <span>辨識出的文字 / 手動關鍵字即時比對</span>
+                    </label>
+                    <button id="clearTextBtn" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
+                        <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+                        清除
+                    </button>
+                </div>
+                <textarea id="ocrResultInput" rows="2" placeholder="OCR 辨識結果會自動填入此處，您也可以直接在此輸入部分對話文字（例如：摩根、聖杯、濃縮咖啡）即時查詢..." class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition resize-none"></textarea>
+                <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>演算法已自動忽略標點符號、空格與部分錯字雜訊</span>
+                    <span id="CleanedQueryPreview" class="text-emerald-400/80 truncate max-w-[220px]"></span>
+                </div>
+            </div>
+
+            <!-- 前 5 名最相似候選清單 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                        <i data-lucide="list-Filter" class="w-4 h-4 text-sky-400"></i>
+                        <span>相似問題候選排行 (點擊可切換檢視)</span>
+                    </h3>
+                    <span class="text-xs text-slate-400">Top 5 結果</span>
+                </div>
+
+                <div id="candidatesList" class="space-y-2.5 overflow-y-auto max-h-[340px] pr-1">
+                    <!-- 動態生成候選項目 -->
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- 題庫管理 / 檢視 / 匯入 Modal -->
+    <div id="dbModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="database" class="w-5 h-5 text-emerald-400"></i>
+                    <h3 class="font-bold text-base sm:text-lg text-white">完整題庫檢視與自訂匯入 (data.txt)</h3>
+                </div>
+                <button id="closeDbModalBtn" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-4 border-b border-slate-800 bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
+                <div class="relative flex-1 min-w-[220px]">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="dbFilterInput" placeholder="在全部 467 筆題庫中搜尋 Num、問題或最佳選項..." class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium cursor-pointer transition flex items-center gap-1.5">
+                        <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                        <span>匯入新 data.txt 檔案</span>
+                        <input type="file" id="importDataFileInput" accept=".txt,.csv" class="hidden">
+                    </label>
+                    <button id="resetDefaultDbBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition">
+                        還原內建 467 筆題庫
+                    </button>
+                </div>
+            </div>
+
+            <!-- 題庫表格清單 -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-slate-400">
+                            <th class="py-2 px-2 w-16">#</th>
+                            <th class="py-2 px-2 w-20">Num</th>
+                            <th class="py-2 px-2">問題 (NPC 對話)</th>
+                            <th class="py-2 px-2 w-1/3">最佳選項</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dbTableBody" class="divide-y divide-slate-800/60">
+                        <!-- 動態載入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 內建完整 467 筆題庫資料 (來自 data.txt) -->
+    <script id="rawDatabaseText" type="text/plain">
+1 | Num | NPC | 問題 | 最佳選項
+2 | 2640 | 你明天不用來也沒關係，各位應該也會不方便。 | 我想再和亞瑟變親近
+3 | 2650 | ...嗯？你受傷了嗎？ | 我很想你...
+4 | 2659 | 啊，各位？有什麼事嗎？ | 你累的話我下次再來
+5 | 2668 | …所以，你今天可以先回去嗎？ | 我知道了
+6 | 2677 | 你有什麼特別的理由必須要跟我聊天？ | 我有興趣
+7 | 2686 | 抱歉，我今天狀態不好。再見。 | 哪裡不舒服？很嚴重嗎？
+8 | 2694 | …喔，你來了？我和蘭斯洛特在聊天…，我們下次再聊好嗎？ | 下次再聊
+9 | 2704 | 喔…嗯…有點尷尬。你有什麼想和我說的嗎？ | 吃過了嗎？
+10 | 2714 | 呼…我已經婉轉拒絕你，老實說，我覺得和你說話有點不舒服。 | 如果惹你不高興，我道歉。
+11 | 2724 | 摩根有警告過我，她說你那親切的微笑背後，有著什麼目的…。 | 我想幫你
+12 | 2735 | 你說我以前有允許過？…我嗎？啊…就算是那樣…。 | 我知道了，我就看看。
+13 | 2744 | 有人這樣說，要是被那眼神騙到，王冠就會被搶走。各位，你們有什麼目的吧？是聖杯嗎？ | 我的目的就是你。
+14 | 2754 | 抱歉，在我結束訓練之前，你可以去別的地方嗎？ | 竟然亂成那樣！
+15 | 2763 | 難道…摩根的警告是真的…。 | 我不靠近…。
+16 | 2771 | …不是，如果你真的想吃…，可以去旁邊的桌子。 | 不要噎到，好好吃。
+17 | 2779 | 你覺得對國王來說，什麼是最重要的？ | 領導力
+18 | 2789 | 呵呵，所以，怎麼樣？我很帥吧？ | 嗯!!!完全!!!
+19 | 2797 | 我從小接受的是個人教育，不太能想像那種情況…。呵呵，和朋友們一起上學很有趣吧？ | 和朋友見面很好
+20 | 2805 | 摩根怎麼樣？很有禮貌很正直吧？ | 我想和摩根變熟!!
+21 | 2816 | 你問為什麼敬佩？這次他不是得到聖杯了嗎。他到底有什麼力量呢？ | 純真？
+22 | 2824 | 嗯，你想的和我差不多…，每天不休息，一直跑步的生活。 | 會變成血和肉
+23 | 2833 | 為什麼人們會喜歡花呢？ | 花也有美麗的試煉
+24 | 2841 | 你喜歡聊什麼？ | 遊戲
+25 | 2850 | 要讓不同的人好好相處，是件不容易的事。這需要有很好的統治者才能做到。 | 你也會變成那樣
+26 | 2860 | …你呢？念書這種事，你不累嗎？ | 我是肉體派！體育課最棒！
+27 | 2868 | 我還沒有結婚…，未來我可能會結婚吧？為了培養繼承人…，我遲早有天得結…。 | 國王也很辛苦的
+28 | 2876 | 我一開始以為是怪物，差點砍了。哈哈哈，因為藍頭髮的狐狸少年哭了，我才知道他不是怪物。 | 走路揮劍很危險
+29 | 2884 | 雪如果下很大，國家也會受到很多損害…。因為各種事情煩惱也很多嗯…各位喜歡什麼樣的天氣呢？ | 晴朗的日子
+30 | 2892 | 騎士團應該也是有很多志同道合的人在一起？你覺得騎士團怎麼樣？ | 感覺這目的挺好的
+31 | 2901 | 不過因為類型太多了，都不知道該看哪個。你可以推薦什麼好看嗎？ | 鐵漢
+32 | 2909 | 嗯，雖然我第一次踢足球，不過運動流汗之後，心情很好！各位喜歡運動嗎？ | 非常喜歡
+33 | 2917 | 有一天我也會有小孩，那孩子會成為我的繼承人吧？嗯…你喜歡幾個孩子？ | 多多益善
+34 | 2927 | 讓你看到這種小事都做不好，有點丟臉。我還是拿劍比拿茶杯好，呵呵。 | 笨笨的像亞瑟也挺好
+35 | 2937 | 各位喜歡哪個時間呢，早上、中午、晚上？ | 早晨
+36 | 2945 | 各位，你們有什麼想問我的嗎？不管什麼我都回答！ | 休息的時候做什麼？
+37 | 2954 | …啊哈哈，你真是粗心。嚇到我了，小心一點。 | 我很健壯，沒事。
+38 | 2964 | 這是很苦的濃縮咖啡啊，呃…怎麼辦。 | 要加糖漿嗎？
+39 | 2977 | …不，等等，有人看著我會無法專心。感覺要做得更好…。 | 喝點水吧
+40 | 2989 | 你們不吃這麼多嗎？ | 吃得真好...
+41 | 2998 | …我想把那裡打造成和平幸福的國家，沒有懷疑和紛爭的國家。 | 亞瑟是偉大的國王
+42 | 3008 | …為什麼會變成這樣呢？(亞瑟拿出自己做的料理)(…這東西黑到難以稱作料理) | (直接入口)
+43 | 3019 | 真奇怪，腦子裡霧濛濛的…，還有點覺得悲傷，為什麼呢…？ | 這裡我們曾經一起來過啊！
+44 | 3028 | 這種小擦傷很快就會好，你太擔心了。 | 我來治療
+45 | 3037 | 嗯…只是，突然想到故鄉裡蘭斯洛特煮的菜。在卡美洛的時候，偶爾他會煮東西給我。 | 我的料理更好吃...
+46 | 3046 | 好像我的心不屬於我一樣…，很混亂。 | 是因為詛咒！相信我！
+47 | 3056 | ...嗯？呵呵，你害羞嗎？沒受傷吧？ | 好害羞！
+48 | 3065 | ...你，想成為我的人嗎？如果你選擇我，我不會讓你後悔的。 | 你才是我的人!
+49 | 3076 | 唉……我，做錯什麼了嗎？我被蘭斯洛特討厭了…。 | 下次給點憤怒的表情吧
+50 | 3085 | 昨天我也因為太好吃了，吃了三碗飯，哈哈！ | 你不想念家鄉食物？
+51 | 3096 | …嗯？你，看起來有點不對…。哪裡不舒服嗎？看起來不太好。還是…你不喜歡鬼魂之類的話題？ | 鬼…好嚇人…
+52 | 3104 | 有想關心的人嗎？ | 你
+53 | 3113 | 什麼，不過就是單純的攀岩。在山頂的梅林讀完書之前，沒有護具，爬完攀頂就行的訓練。 | 單..單純？！
+54 | 3121 | 我其實也很喜歡動物呢！你也喜歡動物嗎？你喜歡什麼動物？ | 猛獸
+55 | 3130 | 你應該談過很多戀愛吧？ | 不是那樣
+56 | 3139 | 呼...你昨天睡得好嗎？你通常什麼時候睡？ | 太早
+57 | 3147 | 我身為一國的國王，我對童話王國的故事很感動。不列顛的危機，大家也會和我一起戰鬥嗎？你的國家，真的很厲害。 | 當然！
+58 | 3158 | 語言或數學..嗯，還真傳統的學問。你有喜歡的科目嗎？ | 體育最棒！
+59 | 3167 | 5點起床，7點開始劍術訓練，10點開始魔法訓練。除此以外，還有各種禮儀、教養、歷史、政治、軍事…。從我入城之後一直這樣。 | 好像很累
+60 | 3175 | 嗯，而且梅林喜歡的點心太甜了…，我只要一杯紅茶就足夠了。 | 喝得舒服是最好的
+61 | 3184 | 我沒有純真的心嗎？是缺少什麼嗎？ | 你的心甜蜜又溫暖
+62 | 3193 | 你喜歡劍嗎？不管如何…因為是跑者，沒什麼機會可以揮劍吧？ | 展現隱藏的劍術實力
+63 | 3203 | 因為…今天沒有梅林的課！ | 好久沒好好休息了
+64 | 3214 | 你覺得哪個節日最有趣？ | 春節
+65 | 3222 | 你覺得愛情是什麼？ | 可以倚靠的事
+66 | 3231 | 雖然就算沒有我，也有很多有能力的大臣…。但我還是不放心，國王這位子不能有任何疏忽。 | 你已經是優秀的國王了
+67 | 3240 | 有什麼事？如你所見，我正在訓練。如果你要打擾我，請回去。 | 因為帥所以來看...
+68 | 3249 | 吃飯的時候要安靜，不要跟我說話。 | 一起吃才好吃
+69 | 3258 | 你有事找亞瑟嗎？這樣的話我就先走了，你們聊。 | 我本來想和你說話？
+70 | 3266 | …為什麼這樣看我，我臉上有東西？ | 頭髮真好...
+71 | 3274 | 看到你就有種複雜的感覺，如她所說，有懷疑，心裡也不舒服…。 | 我想你了
+72 | 3282 | (蘭斯洛特好像心情不好)(皺著眉頭) | 加油
+73 | 3291 | (一片寂靜....) | 本來你就話少？
+74 | 3299 | 是有點煩。 | 抱歉....
+75 | 3307 | 沒人說過你不會看臉色嗎？ | 你討厭我嗎？
+76 | 3315 | 就算我說了這種話，你還想繼續跟我聊天？ | 你有那個魅力
+77 | 3324 | (冷漠地再次閉上眼的蘭斯洛特) | (蓋上毯子)
+78 | 3333 | ..........(蘭斯洛特無視我！) | 不要看不起人！
+79 | 3342 | 你說你叫什麼名字？ | (仔細教導)
+80 | 3351 | 呼…你，是不是喜歡我？ | 身為朋友？
+81 | 3360 | 我不是每天都閒著沒事做，無法遵守約定我很抱歉，請理解。 | 我一直在等你...
+82 | 3369 | …但是，你都拿來了，我就收下吧。我之後再吃。 | 血糖低的時候吃
+83 | 3379 | ...什麼？我做的料理看起來很好吃？要是不合你口味，我不負責。 | 你做的都很好
+84 | 3389 | ...唉，最近經過附近的時候，感覺頭痛加深。到底是怎麼了…。 | 創造新的回憶吧
+85 | 3398 | 這種不合邏輯的動力，真是荒謬。不如倒入魔力，即便要花上一整個晚上。 | 準備滿滿的甜食吧
+86 | 3407 | 而且...摩根，那女人是梅林的弟子。果然是那傢伙的弟子，陰險無比。 | 梅林的弟子的話，可以。
+87 | 3416 | 和你這樣說話我也有點尷尬，其實我並不想這樣。 | 我想和你變熟！
+88 | 3425 | 真是奇怪，很多女人跟著我。就算我冷淡應對還是跟著…，真不知道她們在想什麼。 | 冷的東西也有魅力。
+89 | 3433 | 大家看起來都挺閒的，我們還為了找聖杯到處奔波。 | 大家高興就好
+90 | 3443 | 這次為了找聖杯所以來童話王國？真是各方面都偉大的人啊，顆顆，亞瑟和梅林那傢伙慌張的表情，我忘不了。 | 聖杯這樣隨便拿可以嗎？
+91 | 3452 | …什麼？真的會實現願望？你也許過願嗎？你許了什麼願？實現了嗎？ | 想跑步厲害的願望
+92 | 3462 | 你跑步有什麼好處嗎？ | 只是跑步
+93 | 3470 | 所以，你想和我說什麼？ | 關於世界局勢
+94 | 3478 | 不知道他在想什麼，奇怪的魔法實驗…無法讓人捉摸的傢伙。 | 梅林的試驗我也有
+95 | 3486 | 我不喜歡，這樣會拉低騎士的風采。 | 推薦精華液
+96 | 3496 | 我挺好奇你的風格，你平常喜歡穿什麼衣服？ | 休閒
+97 | 3505 | 跑者，你覺得呢？你覺得什麼禮物好？ | 我需要的東西
+98 | 3514 | 不過我想知道我是哪裡不足，…應該要具備什麼，才能獲得人們認可呢？ | 溫暖
+99 | 3523 | 不過有了空閒之後，我倒不知道要做什麼了…。 | 發呆
+100 | 3531 | 什麼，別擺出那種臉。因為沒什麼話題，你問什麼都可以。這是為了改善和你的關係。 | 平常的訓練方法
+101 | 3539 | 喂，跑者。這個童話王國沒有適合訓練的地方嗎？ | 亨利城地下
+102 | 3547 | 嗯...跑者，你喜歡哪個季節？ | 冬天
+103 | 3555 | 啊，你來啦。因為我有點無聊，所以我跟梅林借了書。 | 如果有打擾到你，我明天再來？
+104 | 3563 | 不過這鍊金術…到底是做什麼的呢？我對魔法或鍊金術完全無感。 | 世界也是鍊金術做出來的
+105 | 3572 | 呼..累是累，不過走到頂還挺有成就感。童話王國高處的空氣很乾淨。 | 試煉之塔你上去了？真厲害！
+106 | 3580 | 要是有機會，我想吃吃這國家最棒的料理。你有推薦的菜單嗎？ | 啤酒炸雞
+107 | 3590 | …阿龍，牠是一隻飛貓。很聰明，也很乖。 | 想你了
+108 | 3600 | (蘭斯洛特毫不猶豫地戳臉頰，瞇眼。)(真是完美的可愛眨眼姿勢！)喂，可以啊，有什麼問題？ | 我搞錯了嗎，呵呵
+109 | 3611 | 我要先回去了....嗯...(蘭斯洛特歪著走路) | 我扶你
+110 | 3623 | 老實說，我曾經忌妒的要死。我曾經想成為國王，相信我是那把劍的主人。那時候覺得天都塌了，顆顆。 | ...聖杯到手！
+111 | 3635 | ...嗯？你盯著我看什麼？皮膚管理不也是自我管理的一部分嗎。 | 我也想試試…
+112 | 3647 | ...喂，你以後也會結婚嗎？ | 我想成為愛人的依靠
+113 | 3656 | ...你是笨蛋嗎？跑得太高興竟然還跌倒 | 現在沒事了...
+114 | 3665 | 應該是那個詛咒讓我感冒，咕魯咕魯…，呃呃，梅林那小子..！ | 很不舒服嗎？
+115 | 3674 | 我不像亞瑟或梅林那樣，和摩根認識很久。我是正式受封騎士，去卡美洛之後，她以精靈女王的身分跟我初次見面。那時的她比現在更難以捉摸。 | 第一印象不太好？
+116 | 3684 | 話題扯了這麼久。你這傢伙平時也有喜歡的愛好嗎？我很好奇別人的愛好是什麼。 | 遊戲
+117 | 3692 | 哼…我害怕的只有無法預料的事，我的未來…。 | 話說你後面有鬼
+118 | 3701 | 有人問我這是在控制體重嗎，確實我可能是因為吃得少，所以不胖，但是…。 | 我要吃很多才會飽！
+119 | 3709 | 明明說會永遠愛我。放下是自由，但我覺得很神奇。愛情本來都是那樣的嗎？ | 愛情有很多種
+120 | 3718 | …其實我並不是討厭他，既然他認可我，我也認可他。…我絕對不想讓他知道這份心意。 | 我覺得你是很棒的對手
+121 | 3728 | 老說不喜歡，用這種方式欺負人。又不是小孩子…。 | 你也要報仇！
+122 | 3736 | 嗯，我可不像亞瑟傢伙那麼親切，我覺得沒有必要。 | 和我變熟就行
+123 | 3745 | 唉，梅林的教育方式完全錯了。這樣下去，亞瑟這傢伙遲早累倒。 | 梅林，應該要阻止他吧？
+124 | 3754 | 嗯，我就聽聽你的意見吧。跑者，你的人生中，什麼是你認為重要的價值？ | 自尊
+125 | 3762 | 呵呵...我酒量很差啊...只要喝一杯，第二天頭就會痛。 | 給我藥嗎？
+126 | 3771 | 嗯，你這傢伙怎麼樣？你可以早起嗎？ | 精神飽滿的早晨！最棒！
+127 | 3779 | 你覺得意外嗎？我在卡美洛也養過動物。呵呵，要不要猜猜這是什麼？ | 貓
+128 | 3787 | 你不打算加入騎士團嗎？只要稍微訓練一下，似乎就能成為一名還不錯的騎士。 | 你沒想過當跑者嗎？
+129 | 3795 | 你對那些傢伙感興趣嗎？嗯，本來我只是想看看，但突然覺得好奇。 | 你對我有興趣？
+130 | 3803 | 你也經常跑步吧？...你經常拿第一嗎？ | 可惜每次都輸...
+131 | 3811 | 啊，你來啦。我在梳頭，沒注意到你。 | 你都是這樣管理？
+132 | 3819 | 我會覺得嫉妒，想要超越他但是…，同時他也是可以放心託付的好友。我們關係複雜。 | 你有你自己的光
+133 | 3827 | 而且~我正好在看書! | 我也是來讀書的？
+134 | 3836 | 你找聰明睿智的梅林有事嗎？ | 偉大的梅林！
+135 | 3844 | (與梅林短暫對上眼)(梅林像是覺得麻煩一樣，轉過身!) | 給零食
+136 | 3854 | 我已經把以前的事全忘了。一個都不記得! | 我要創造新的回憶
+137 | 3863 | …你有事嗎？希望不會妨礙我的研究，你要不要來當我的實驗對象？ | 梅林牌藥水乾杯！
+138 | 3872 | 呼啊啊啊~(梅林懶洋洋地打哈欠) | 我也哈啊~
+139 | 3880 | 慢走，跑者! | 下次再見了，梅林。
+140 | 3889 | 你難道不是我很想忘記，那種無禮或無趣的人嗎？呵呵 | 如果是那樣，我道歉。
+141 | 3897 | 如果你再來找我，我就回答你。當然，你不來也可以~。 | 下次不忙的時候我再來
+142 | 3905 | 為什麼？(梅林似乎有些不高興...) | 要吃巧克力嗎…？
+143 | 3914 | ...不，沒什麼。 | 是什麼…？ (用可憐的眼神看著)
+144 | 3923 | 那還是在我們來到童話王國很久之後的事。難道不能懷疑嗎？你有什麼企圖？還是說，受誰的指使？ | 這段期間沒有機會親近啊
+145 | 3932 | .........(梅林把書緊貼在臉上!) | 你是故意的吧！
+146 | 3940 | 和跑者約定每天對話的事。我總覺得我太輕易答應…。 | 你這麼討厭我…？
+147 | 3948 | 你想和我說些什麼？ | 關於魔法
+148 | 3956 | 用這種模糊、抽象、不合邏輯，不理性且無法衡量的觀念為動力，到底是什麼。我只覺得又累又煩。 | 需要愛情啊
+149 | 3967 | 這種現象之所以會出現，是因為…，總覺得有種看不見的東西在吞噬我們所有人。不是嗎？ | 某人做的
+150 | 3978 | 作為老師，我也是費了一番功夫把他養大。跑者你想不到吧？ | 其實你很愛惜亞瑟啊
+151 | 3987 | 跑者見過摩根嗎？那個粉頭髮的女人。你覺得怎麼樣？ | 有點可疑...
+152 | 3999 | 呃呃…我特別討厭那些動作難以預測的動物。不知道在想什麼…我不喜歡。 | 我會阻止！
+153 | 4009 | 嗯……………噗 | 為什麼笑...
+154 | 4017 | 用簡單的話說是什麼...?對跑者來說可能有點難~ | 你！
+155 | 4025 | …嗯？ | 以後請多多教我
+156 | 4034 | 實驗內容很簡單。跑者喝下這可疑的藥水後~，我就會記錄你的反應。 | 哇！真有趣！
+157 | 4043 | ............(只聽到紙張翻動的聲音，我該怎麼做？) | (一起讀書)
+158 | 4052 | 在還未理解魔法理論的人類面前，出現了比人類更強大的生命體，會怎樣呢？比他們更先進的文明體來統治人類，如何？ | 機械和科學會解決的
+159 | 4060 | ...聽說你突然暈倒，所以很慌張？我本來身體就很弱，必須依靠魔力。 | 我會告訴亞瑟，不用擔心。
+160 | 4069 | 王者之劍之後，竟然把聖杯帶到童話王國。這絕對不是普通人吧？ | 天才鍊金術士的兒子
+161 | 4077 | 在童話王國待太久很痛苦…，梅林對花粉過敏，哈啾！ | 吃藥嗎？
+162 | 4086 | 如果是這個的話，就可以不受最高速度的限制，盡情奔跑~。 | 青蛙啊....
+163 | 4095 | 那麼，你想和我聊什麼？ | 魔法
+164 | 4103 | 唉~好煩，好累。像今天這樣的日子真麻煩。 | 有什麼煩惱嗎？
+165 | 4112 | 總之，大家還沒長大，很可愛吧~?也許這輩子就這樣過下去…。 | 梅林，難道年紀…？
+166 | 4121 | 跑者認為國王需要什麼樣的能力？ | 觀察力
+167 | 4131 | 可以說是我無法理解的趣味吧…，有那時間，多學一點東西不好嗎？ | 跑步也要學習
+168 | 4139 | 梅林最擅長的魔法是什麼？ | 詛咒術
+169 | 4148 | 咀嚼咀嚼…咕魯！跑者也喜歡甜點嗎？你喜歡什麼甜點？ | 杜拜巧克力餅乾
+170 | 4156 | 嗯，當然，我承認這因人而異。跑者你最喜歡哪種類型的書？ | 百科全書
+171 | 4164 | 嗯…不過，能打敗我的偉大魔法師到底是誰呢？無論怎麼想都想不起來…。 | 哈利波特
+172 | 4172 | 跑者你有什麼想問我的嗎？這次無論什麼，我都會回答~。 | 梅林的1號寶物是？
+173 | 4181 | 我…從現在開始…要欺負蘭斯洛特！你快來幫我！ | 準備完畢！
+174 | 4191 | 你看得太認真我會不好意思，這裡的魔力比我想得更濃縮。 | 總是很想看
+175 | 4200 | 跑者你怎麼看惡魔？ | 只不過一個種族
+176 | 4212 | 而且亞瑟會聽我的話，這又跟我名譽有關，怎麼樣，我的計劃如何？ | 這真的很梅林
+177 | 4223 | 是不是很尷尬？ | 以前我們關係很好？
+178 | 4234 | 啊，太晚了嗎，嘻嘻。(梅林蹲在我面前笑) | 快告訴我…
+179 | 4243 | (梅林的眼鏡，讓人有點在意。) | 視力不好？
+180 | 4252 | 怎麼樣？有興趣嗎？你想展望怎樣的未來呢？ | 和你的配對
+181 | 4262 | 隨便說吧。我答應你，我不會生氣。 | 雖然煩人，但不討厭
+182 | 4271 | 呵呵呵呵…，老實說亞瑟和蘭斯洛特，你更喜歡誰？ | 梅林
+183 | 4279 | 跑者呢？你有朋友嗎？很多嗎？ | 你不是我的朋友嗎！
+184 | 4287 | 亞瑟大人雖然成長得很出色，但還不夠。他必須成為更完美的國王，如果不繼續成長…。 | 你為什麼這麼執著？
+185 | 4295 | 每次蘭斯洛特叫我小孩的時候，我都很生氣。我是不是該施個矮人詛咒算了。果然，我個子有點矮…。 | 小點很可愛
+186 | 4303 | ...所以，跑者呢？你是狗派？貓派？ | 人類最強
+187 | 4313 | 嗯...現在我無所不知，要不要試試看？請說出一個你覺得我不會的單詞！ | 漢堡漢堡漢堡堡(以下省略)
+188 | 4322 | 呵呵呵，所以如何呢？參觀我的藏書有什麼感想？ | 是書房還是地牢…
+189 | 4331 | 不過一旦中了惡靈的詛咒，通常會流血淚，或者看錯東西而發瘋，所以有點麻煩。當然，跑者很勇敢，你難道不害怕惡靈之類的東西嗎？ | 如果我被惡靈纏上，幫我驅魔
+190 | 4339 | 嗚嗚…因為用太多頭腦了嗎？容易犯困，感到疲倦…。跑者是不是很容易犯睏？ | 挺多的
+191 | 4347 | 我是完全個人主義，根本無法想象。與某人共度一生，這可能嗎？ | 也是有優點
+192 | 4355 | 梅林最討厭的類型是什麼樣的人呢？ | 蘭斯洛特
+193 | 4365 | (跑者的身體騰空而起！倒著...) | 你故意的吧？
+194 | 4374 | 請選擇你想要的課程，誰知道呢？也許跑者也能成為國王…。 | 雪山裡短袖露營
+195 | 4383 | 去年的跑者是怎麼樣的？過得愉快嗎？沒有後悔的事？ | 應該更認真念書..
+196 | 4392 | 如果強行使用有限的法力，就會變成這樣…。…我真是個傻瓜…，突然就倒下…。 | 不像笨蛋
+197 | 4400 | 嗯...不過如果要讓全國都支持，恐怕現在只能以小規模的方式引入。你覺得應該先教哪個科目比較好？ | 語言教育
+198 | 4409 | ...什麼?你對我有興趣？我不是騎士，我是精靈女王兼魔女，對吧？你的頭沒事吧？ | 想變熟
+199 | 4420 | ....喂，你，你打算聽到什麼時候？ | 黑魔法效果很好
+200 | 4430 | 和我對話後要做什麼？要不要試著勾引我一下？ | 我會贏的
+201 | 4440 | 我留你一條命，你現在走吧。我沒什麼耐心。 | 因為漂亮所以看
+202 | 4449 | 你是沒有目的，還是你隱藏了目的？還是，你只是太閒？ | 刻意抽出時間
+203 | 4457 | 在這種地方，什麼東西會顯現聖杯？就像小孩子玩過家家一樣。 | 和你不搭
+204 | 4466 | 當然有囉，你以為我是什麼義工嗎？ | 那也很好
+205 | 4475 | 你看什麼？怎麼，很神奇？這就是黑魔法。你再看…，我可能會把你的眼睛拿來為烏鴉。 | 真帥，也告訴我吧。
+206 | 4483 | 世上最甜蜜的心意..，你不是正被那種抽象又空洞的東西玩弄嗎。 | 我想給你
+207 | 4491 | 呵呵，好。關於亞瑟，隨便問。說起來，我們可是從很久以前就認識的關係啊。 | 摩根喜歡的事
+208 | 4500 | 雖說如此，但我和梅林從很久以前就是熟人了。呵呵呵... | 摩根好感度累積方法
+209 | 4509 | 雖然不及亞瑟和梅林...但還是比你更瞭解蘭斯洛特。你有什麼想知道的？ | 摩根的理想型
+210 | 4517 | 看騎士們懷疑你、討厭你，你心裡怎麼樣？你生氣嗎？難過嗎？還是覺得空虛？ | 生氣！傷心！空虛！
+211 | 4525 | 反正你這種話，沒人聽。我已經詛咒你，讓你懷疑並憎恨我。呵呵... | 你沒中詛咒？
+212 | 4534 | (摩根拼命裝作不認識跑者) | 你好，摩根！
+213 | 4542 | 當然，我知道我們過去有點親近。不過…… 怎麼說呢……總覺得，好像不該更接近各位... | 慢慢靠近
+214 | 4552 | 嗯，感謝你的心意，...我不太喜歡甜的東西。謝謝你。 | 那我得吃吃
+215 | 4563 | 嗯，沒事，既然我為了聖杯又來了，請多多關照。 | 很高興能再見面
+216 | 4572 | ...嗯，也就是說... 這一部分是... | 剛好我也在做作業
+217 | 4582 | 感覺這不是純粹的對話，而像是刻意的接近。這只是我的錯覺嗎？ | 好好看著我的眼神！
+218 | 4591 | 現在應該已經是王后殿下了吧？王后殿下過得好嗎？ | 你還是很美
+219 | 4601 | 那對你來說也有很多經歷吧？你能告訴我你印象最深刻的地方是哪裡嗎？ | 地下世界
+220 | 4613 | 這是給卡美洛的騎士們的禮服之類的東西。雖然不是戰鬥服，實用性較差，但……它在某種程度上傳達了關於卡美洛的自尊與騎士的高潔的信息。 | 跟亞瑟很配！
+221 | 4623 | 嗯?這飲料顏色真五光十色。顏色鮮豔能讓眼睛愉悅。這個是…什麼飲料？ | 為你準備的！
+222 | 4633 | 你如果遇到蘭斯洛特，可以跟我說嗎？他到底在哪裡？ | 一起找找？
+223 | 4643 | 呵呵，小時候我和她一起…，我們都是梅林的學生。哈哈！兩個人真是吃了不少苦頭。在梅林底下。 | 一起說服看看？
+224 | 4656 | 嗯，如果有機會的話，我想和他們談談...和誰聊比較好呢？ | Lala普利耶特亨利
+225 | 4672 | 那無數的星星中，會不會有一顆照亮了我該回去的地方。難道不能像星星一樣閃閃發光嗎...有很多這樣的想法。 | 偶爾這樣也沒關係
+226 | 4685 | 因為長期待在童話王國裡並結識的人，覺得不好意思...我曾適當地從梅林那裡拿童話王國的貨幣作為零用錢。不過...今天早上一看，發現零用錢已經全部花光了。 | 要介紹打工給你嗎？
+227 | 4697 | 不是~沒有喝多...我只是喝到心情適度愉快的程度，沒問題。你也來一杯？ | 製造超級炸彈酒
+228 | 4709 | 我無法理解。我對你態度冷淡。通常那樣的話就應該退讓，為什麼你…。 | 不用勉強記得
+229 | 4719 | 沒事的話可以離開嗎？你這樣我會無法集中精神。 | 我也要擦鞋子
+230 | 4729 | 不是說要跟著我吧？我能夠單獨執行任務，請你去完成你被賦予的其他任務。有點在意。 | 我想幫你完成任務
+231 | 4737 | 請找一個比我更擅長對話時會讓我感到愉快的對象。旁邊那片叫梅林的傢伙怎麼樣？至少不會無聊吧 | 感覺很興奮
+232 | 4747 | ...唉，聖杯啊.....(蘭斯洛特拼命地迴避著跑者。) | 邊喝茶邊等
+233 | 4756 | 雖然不知道世上最甜蜜的心是什麼，但無論如何，那真的是一種徒勞而毫無意義的感情。 | 也有不變的東西
+234 | 4767 | ........做得相當不錯。訓練果然有回報。 | 多虧你的幫忙
+235 | 4776 | 所以...我適合做什麼愛好？你能推薦一下嗎？ | 拍照
+236 | 4786 | 如果可以的話，要不要幫我救救你的同伴？既然如此，還是希望對方能和我說得順口。 | 阿貝爾
+237 | 4798 | 唉，今天特別不完美…。 | 在我眼裡你是最棒的
+238 | 4808 | 我也能體驗釣魚嗎？如果能釣到可以作為烹飪材料的魚就更好了。 | 將將~炫耀釣到的魚
+239 | 4822 | 別動，至少消毒一下吧。如果傷口擴大，受苦的只有你自己。 | 蘭斯洛特也不能受傷
+240 | 4834 | 따分한가? 有時會去遠征，也會打仗。一直跟在亞瑟後面。 如果連那個都顯得粗糙的話，那也沒辦法。因為那就是王室騎士的生活。 | 不危險嗎？
+241 | 4846 | 你還不錯，姿勢比剛開始時穩定很多。這種程度...花我的時間來教，還算值得。 | 謝謝師父！
+242 | 4855 | 為什麼與跑者的回憶變得模糊呢？難道不是那樣毫無價值的回憶嗎？ | 過去不會改變
+243 | 4867 | (梅林展開他正在讀的書給我看。用一種無法識別的語言寫著！！完全不知道在說什麼！) | 可以教我嗎？
+244 | 4876 | 我每天總是很忙嗎？如果礙事，那可不行哦？ | 我想知道你在做什麼
+245 | 4886 | 梅林如果在工作中被打擾，可能會發射類似火球的東西吧？因為我非常討厭分心！ | 在制定亞瑟的課程？
+246 | 4896 | (梅林突然消失了!!好像施了傳送魔法。) | 找草叢後面
+247 | 4904 | 跑者是笨蛋嗎？ | 只知道你的傻瓜☆
+248 | 4913 | 跑者也對聖杯感興趣嗎？跑者又不是騎士？ | 我想給你聖杯
+249 | 4922 | 這是只給圓桌騎士們的卡美洛禮服。還有漂亮的裝飾。怎麼樣？ | 你不是對花過敏嗎？
+250 | 4931 | 跑者為什麼跑步？飛過去不就行了嗎。 | 不可能飛起來吧
+251 | 4940 | 請保持安靜！我開發了一個能把頭髮綁成蘋果頭的魔法。 | 去找蘭斯洛特弄吧
+252 | 4950 | 真的，為什麼即使成為了國王還這麼不成熟呢？要是大家都能像梅林一樣聰明睿智就好了。 | 所以很了不起
+253 | 4960 | 特別第一個實驗對象是跑者！請不要拒絕，請喝吧。嘻嘻...(梅林強行將一瓶藥水塞進了嘴裡……咕嘟) | 我很喜歡梅林
+254 | 4971 | 不是那樣…，我昨天整晚研究魔法，頭暈暈的…。啊啊啊啊啊哈~ | 累了就睡
+255 | 4983 | ....咦？ | 喂！別看！
+256 | 4994 | 如果我成為國王…，你覺得卡美洛會變成什麼樣子？一個極其富強而偉大的國家嗎？ | 亞瑟更適合
+257 | 5005 | 我每次都會等你呢？ 哈哈，你到底對我施了什麼魔法？ | 什麼都沒做。
+258 | 5015 | ......... 無法相信。不...不想相信。 這真的是我的未來嗎？ | 書就只是書
+259 | 5024 | 可是為什麼偏偏是送糖果呢？ 童話國流行糖果嗎？ | 是喜歡的意思
+260 | 5034 | （亞瑟身體搖晃了一下。 跑者用手摸了摸亞瑟的額頭。燙得像火球一樣！） | 都是因為天天勉強自己才會這樣！！
+261 | 5043 | ...家務真的是最糟糕的。 因為我從來沒有接受過家務方面的教育。 | 我喜歡顧家的人……
+262 | 5054 | .........哈...哈哈... | 剛好需要筷子
+263 | 5063 | ...哈哈，你察覺到了嗎？ 我，最近經常想起你。 這是什麼樣的感情呢？ | 跟我一樣的感情
+264 | 5073 | 你跟梅林和蘭斯洛特爵士也很要好嗎？ 像我一樣...不，比我更...喜歡他們嗎？ | 不如你那麼多。
+265 | 5082 | ...呼～暢快多了。 在你面前不知不覺就說出心裡話了呢。 哈哈哈，對梅林當然要保密。 | （抱住亞瑟。）
+266 | 5091 | 看起來很浪漫，但不是能承受的重量。 | 但還是希望你能守護不列顛
+267 | 5103 | （亞瑟喝葡萄酒喝醉了，躺在地上睡著了.. 怎麼辦？） | （撫摸頭髮）
+268 | 5113 | 嗯？不，沒什麼。哈哈哈。 你有沒有想過自己的理想型呢？ | 溫柔的人
+269 | 5122 | 你，今年有沒有什麼想實現的事？ 只要是我亞瑟能幫上忙的，我什麼都想幫你。 | 想要成就愛情
+270 | 5130 | 咳哼…你覺得約會的地點，哪裡最好呢？ | 夕陽西下的海邊
+271 | 5140 | 我這是怎麼了…以前從來沒有這樣過。 拜託你稍微訓誡我一下。 | 一直這樣的話我就不來了
+272 | 5148 | 劍術對練！！ 各位！接受我的對練邀請吧！ | 哇啊！！！！
+273 | 5157 | 晚了才變熟之後，覺得能和你說話的時間 好像所剩不多，我的心好痛… | 不過能變得這麼親近真是太好了。
+274 | 5165 | …啊哈哈，讓你看到我軟弱的樣子，抱歉。 這和我不相稱吧！對不對？ | 不可能一直都很堅強
+275 | 5173 | 嗯…最近我有了一個想讓對方留下好印象的人… 我想獲得那個人的好感，該怎麼做才好呢？ | 展現原本的樣子
+276 | 5181 | 沒有別的意思… 難道…你有放在心上的人嗎…？ | 沒有
+277 | 5191 | 就算其他一切都能原諒， 她試圖拆散你和我這一點，我無論如何都無法原諒。 | 現在有我在，沒事的
+278 | 5201 | 我要怎麼做才能得到你的原諒呢？ 我覺得自己太可悲了。 該受什麼懲罰才合適呢… | 牽著我的手
+279 | 5211 | …哈啊。不。抱歉。在哪裡聽到這件事之後…我晚上怎麼也睡不著。 因為你太耀眼了… | 我只有亞瑟！
+280 | 5220 | 呵呵，如何？ 這樣看，更能感受到大小的差異呢。 | 與亞瑟十指緊扣
+281 | 5231 | 很傻吧？明明只是夢... 我到底在不安些什麼呢。 | 聽說夢是相反的
+282 | 5241 | 嗯。今天特別...好像也有點可愛... | 很害羞，不要這樣！
+283 | 5251 | （亞瑟把手放在跑者的額頭上。） 嗯...好像有點微燒...又好像沒有... | 哈啾！哈啾！哈啾！哈啾！！！！
+284 | 5262 | 我覺得最重要的是，要和我心意相通， 而且在一起時讓人感到自在。 ...你怎麼想？ | 我的未來志願是當王妃
+285 | 5274 | ...呵呵。對，做得很好。 | （把玩亞瑟的手）
+286 | 5285 | 嗯...因為我也想享受一天自由。 也想和你多聊一會兒。 | 告知蹺課的路線
+287 | 5295 | ...呵呵，想法改變之大，連我自己都感到驚訝。 | 是有了喜歡的人嗎？
+288 | 5304 | 雖然有過許多和女性的緋聞，但實際上從未正式和誰交往過。 | 好可憐
+289 | 5313 | （跑者伸出手後，蘭斯洛特 把一小塊巧克力啪地丟到跑者手上。） | 你知道分享糖果的意思嗎？
+290 | 5321 | （和蘭斯洛特愉快地聊了一陣子時， 發現蘭斯洛特的頭髮上停了一隻蟲。 ...該怎麼辦？） | 超級攻擊！！！！
+291 | 5330 | ...有沒有喜歡的食物之類的。 有機會的話我請你吃。 | 會做菜的男人，好帥！
+292 | 5339 | 你應該也讀過吧？ 不列顛和那位國王淒慘的下場。還有其原因。 | 你不是那種人。
+293 | 5348 | 沒什麼好稀奇的。意外地也不會不方便。 因為我從小就一直堅持留著長髮。 | 可以摸摸看嗎？
+294 | 5356 | 我那生硬又冰冷的語氣，你會不會覺得不舒服或討厭……？ 忽然擔心了起來。 | 因為知道你的真心，所以沒關係
+295 | 5365 | 我也是靠這一把劍保護自己數萬次， 並且常常感謝自己能夠使用劍。 你這傢伙沒有會使用的武器之類的嗎？ | 用身體撞過去就夠了
+296 | 5374 | ……啊，抱歉…… 我不是想發火。 | 你在吃醋嗎？
+297 | 5382 | 沒錯，會是和以前一樣的日常。 把你留在這裡…… | 我會很想你的。
+298 | 5390 | 嗯，不是什麼困難的事。 ……你能幫忙我做菜嗎？只是非常簡單的事…… | 不要只當助手，一起做料理吧！
+299 | 5398 | 如果不是的話…… 希望你以後不要再讓我誤會。 | 是因為喜歡才來找你的
+300 | 5406 | 花束和戒指……氣氛好的餐廳…… 問過其他人，但沒有令人滿意的答案…… | 坦率的告白
+301 | 5415 | ……不過……自從遇見你之後，覺得有了站在我這邊的人。 ……希望不是我一個人的錯覺。 | 以後也想當你的靠山
+302 | 5423 | 當、當然是以朋友的身分！我是說。 ……你有沒有想和我一起做的事？ | 一起逛市場買菜
+303 | 5433 | 呼……最近很混亂。 腦中浮現許多想法…… 真正的愛情，到底是什麼…… | 愛就是相信對方
+304 | 5441 | 你呢？ 長髮的男人……你不喜歡吧？ | 這是我的喜好
+305 | 5450 | ……這個週末，有空嗎？ | 你是在邀約約會嗎？
+306 | 5459 | ……你認為他做什麼選擇才是對的？ 夢想？……還是愛情？ | 希望你不要放棄你的夢想。
+307 | 5469 | 可惡。騎士失格啊。 竟然被詛咒之類的東西動搖了內心。 | 以後要加倍對我好！
+308 | 5480 | 這段期間……有沒有其他對你這傢伙感興趣的人？ 還有你呢。怎麼樣？ 你接受了那個人的告白嗎？ | 只有蘭斯洛特而已
+309 | 5491 | ……你睡著的臉太毫無防備，自重一點。 因為是我才無所謂，在別人面前……不准露出這種模樣。 | 是因為在你面前才這樣的
+310 | 5500 | 喂。我只是想確認一下。……你、你聽到了嗎？ | 我也喜歡你
+311 | 5510 | 不要一直……一直讓我在意…… 也不要一直在我眼前晃來晃去…… 也不要讓我發瘋…… | 我喜歡你耶
+312 | 5520 | 因為你每次都用袖子擦汗，看起來很難看。 身為我的搭檔，至少要維持最起碼的品味。 ……別誤會。純粹是為了美觀的理由。 | 你是想著我買的嗎？
+313 | 5530 | 不過最近我忽然有這樣的想法。 放下劍，只是過著平凡的日常，似乎也不壞。 | 在身邊的人才重要
+314 | 5540 | ……上面還留有我的體溫……應該會暖和一點。 | 蘭斯洛特有味道
+315 | 5550 | 因為你這傢伙玩得開心，我也產生了興趣。 | 要打賭嗎？
+316 | 5560 | ……下次叫我。 不要危險地踩著椅子爬上去。 ……知道了嗎？ | 好像靠得太近了...
+317 | 5570 | 反正對你來說，我只是每天聊天的人們當中 的一個而已吧？嗯？ | 我怕你...
+318 | 5579 | 跑者大人有一天也會離開我身邊吧？ 就像其他人那樣。 | 你那樣的樣子我也喜歡。
+319 | 5587 | ……我可以問一件事嗎..？跑者，你喜歡我嗎？ | 無條件喜歡
+320 | 5595 | .............. （視、視線好有壓力……） | (笑)
+321 | 5604 | ……要怎樣才能讓他一直留在身邊呢？ 關進鳥籠裡就可以嗎……？ 弄瞎他的眼睛就可以嗎……？ | 那樣做會幸福嗎？
+322 | 5613 | 而且感覺像在考驗我的預言能力，所以也有點心跳加速。 我的預言，命中率雖然高，但也不是每次都會中。 | ...和預言一致嗎？
+323 | 5622 | 還有，能隨心所欲地擺佈成為國王的亞瑟，不就足夠了嗎？ 只要是我吩咐的，亞瑟什麼都會做。 | 我不喜歡你變得扭曲。
+324 | 5630 | 雖然我們不是情侶之類的…… 我也想送跑者一點禮物。 你想收到什麼禮物？ | 巧克力
+325 | 5638 | 如今我非常貪圖別人的心， ……要怎樣才能連心也擁有呢？ | 先表達你的心意
+326 | 5647 | 現在惡魔的力量總算被好好壓制著…… 但其實我很不安……擔心有一天會不會變成惡魔.. | 有我在，不要不安
+327 | 5656 | ……不過最近有點混亂。 我的愛的方式究竟是怎樣的呢，我在想…… ……跑者的愛的方式又是怎樣的呢？ | 理解對方的愛
+328 | 5664 | 這是魅惑之痣哦。 現在被魔法封印著…… 你知道解開封印會怎樣嗎？嗚呵…… | 用那種方式得到愛的話...
+329 | 5672 | 一直等到跑者來，真的好累啊…… | 等很久了嗎？
+330 | 5680 | 如果和喜歡的人結婚， 就能讓那個人永遠成為自己一個人的嗎？ | 不是擁有，而是一起相處
+331 | 5689 | ……如果跑者的戀人動不動就昏倒或生病的話…… 果然，會覺得有點麻煩、討厭嗎？ | 有我來守護你就好了！
+332 | 5698 | （梅林把手放在我的額頭上。） ... ... ...... 哈啊。 跑者……在魔法方面完全沒天分呢…… | 光是看著就很有趣！
+333 | 5706 | 那個…只悄悄告訴我一個人也可以的。 亞瑟、梅林、蘭斯洛特之中，有你喜歡的人嗎？ | 有
+334 | 5714 | 無論發生什麼事…無論我做出什麼事… 請不要討厭我或拋棄我。 | 別擔心
+335 | 5723 | …那個… 在跑者大人看來…我是不是也有優點呢？ | 激起保護欲
+336 | 5731 | 跑者大人在童話國有特別喜歡的地方嗎？ | 彼得潘地圖
+337 | 5741 | 因為我想試試看。 就算我的心變成一片空白…就算我把你推開… 你是否仍然會選擇我。 | 我的選擇永遠是你
+338 | 5753 | 感覺怎麼樣？很痛苦嗎？ 是不是對我失望而想離開？ 是不是討厭我、怨恨我？ | 如果是那樣的話就不會再誘惑你了
+339 | 5763 | ……嘿嘿。大概是我聽錯傳聞了吧？ | 喝！！！別相信！！！
+340 | 5773 | 結果還是沒找到，只好把聖杯這個媒介當作機會來找你。 梅林是這麼迫切…跑者大人卻好像完全不是。 | 我也一直很想念你
+341 | 5782 | 咦？怎麼辦。跑者大人珍惜的手鐲斷掉了呢。 呵呵。真可惜呢。 | 開玩笑嗎？賠我新的！！
+342 | 5791 | 不要問為什麼喔！ 你猜得到嗎？ 梅林的理想型是什麼！ | 理解我的人
+343 | 5801 | 嗚嗚嗚，我說不出口！！！你是個無恥之徒。 在夢裡那麼任意妄為， 看看你現在若無其事的表情！！真的很生氣！！ | 是什麼夢呀 呵呵
+344 | 5814 | 我的選擇很殘忍嗎？ 拋棄雖然優秀，但作為我的棋子還不夠格的徒弟。 | 希望不列顛能夠和平
+345 | 5825 | 怎麼樣？跑者喜歡嗎？ 我想炫耀想了一整天，簡直快死了。 | 羨慕嫉妒
+346 | 5836 | ............. （梅林朝我張開了雙臂！） | 緊緊抱住
+347 | 5846 | 你看。這是用絕望花做的絕望絕望茶包。 喝一口……就能感受到世上所有的悲傷， 是非常深邃高雅的味道。呵呵。 | 我也只喝一杯...
+348 | 5856 | 嗯，整體來看…… 算是具有堪用玩具程度的價值吧？ | 好好地陪我玩吧
+349 | 5866 | 一看到就覺得是很適合我的花。 呵呵，不是嗎？ | 是和你一樣孤單的花呢
+350 | 5876 | 如果是我……會用魔法一瞬間移動。 是因為做不到那種事才跑的嗎？呵呵。 | 要不要揹著你跑？
+351 | 5885 | 不過，如果硬要擁有武器的話，你覺得什麼好？ 既然如此最好是適合我的。 | 女王的鞭子
+352 | 5896 | 怎麼樣？這個程度好像不難吧。 | 是，主人
+353 | 5905 | 哈啊。所以才會被梅林那種傢伙擺布。 | 不能只是感到害怕
+354 | 5915 | 人類女人的喜好真是特別呢？ | 你更有魅力
+355 | 5924 | 哈啊～到底又藏著什麼陰險的企圖呢？ 亞瑟竟然把那種人當作老師留在身邊。 真是沒有看人的眼光。對吧？ | 摩根 vs 梅林。誰會贏？
+356 | 5934 | 不管是獅子，還是貓……全都不怎麼樣。 哈啊。如果有我中意的動物……我會收為使魔。 哪裡有討喜的動物嗎…… | 非洲冠豪豬
+357 | 5944 | 你覺得那代表什麼？ 那就代表毀滅、不和與不信任。 嗚呼呼，一切都在我的計劃之中。 | 我要付卜金
+358 | 5954 | 有時候也會有種衝動，想把這一切都推翻。 | 要我讓你開心嗎？
+359 | 5965 | 碰到這種粉末的人……會從幸福的記憶開始依序遺忘。 不美嗎？ 越殘忍就越美麗。 | 像你一樣美麗呢
+360 | 5974 | 說不定呢。甜蜜的心也許不是[愛]，而是別的心情。 例如……被背叛時甜蜜的復仇心。 如果聖杯因為那種情感而發動……會更有趣吧。 | 就算我愛你也會發動嗎？
+361 | 5984 | 堅固的城牆崩塌，騎士們的慘叫聲響徹…… 啊，一定是非常美麗的光景吧？ | 一起放火吧！！！
+362 | 5994 | 問一個問題吧。我會對你的未來給出準確的洞察。 當作榮幸吧。 | 我和你的未來
+363 | 6008 | 要給你看嗎？來，來。這裡！ 看到乾蜥蜴尾巴了嗎？把這個搗碎放進茶裡就能做惡夢喔！ 還有這個是蜘蛛卵！圓滾滾的是不是超可愛？ | 真的好漂亮～
+364 | 6019 | 一切都是理所當然的。他是跟在我身後的騎士。 而我以為自己會成為女王。 ……和現在比起來，真是愚蠢的想法。 | 還不晚
+365 | 6030 | 沒興趣。臉又不是畫紙。真可憐。 大家是不是都閒得有多餘的空閒啊？ | 我喜歡原本的樣子
+366 | 6041 | 交給我的訓練變得更嚴苛了。 徒手解除魔法陣。唸咒語直到用盡魔力。 雖然我全都做給他看了。呵呵。 | 比亞瑟更辛苦呢
+367 | 6050 | 雖然我承諾了更大的力量與名譽…… 哈啊。被乾脆地拒絕了。 真是個讓人鬱悶的男人。 | 你還有我
+368 | 6060 | 竟然以這種沒效率的方式生活。 真是可憐吧？呵呵。 | 要我買給你嗎？
+369 | 6073 | 啊啊…人類為什麼要做花束之類的東西呢？ 蘑菇束不是遠比它帥氣又致命嗎。 | 像你一樣
+370 | 6083 | 哈啊。真是個要人費心的傢伙。 過來一下。我特別…幫你用治癒魔法。 | 謝謝你關心我
+371 | 6093 | 嗯…叫做血腸…是吧？呵呵，太好吃了。 叫做牛小腸、牛胃、大腸的那些東西也正合我的口味。 真的…是很適合我的盛宴。 | 你也知道材料嗎？
+372 | 6102 | 我的計劃明明很完美，為什麼老是這些瑣碎的事情來觸怒我？ 我想把一切都毀掉。 | 如果很生氣的話要欺負我嗎？
+373 | 6112 | 喂，跑者。適合我的地圖在哪裡？ 我讓你有榮幸護送我。 | 蜥蜴叔叔的憤怒
+374 | 6122 | …又在晃什麼？又是來找我的嗎？ 哈啊。總之我很累。有事就快說。沒事就消失。 | 摩根!!(開心地揮手)
+375 | 6132 | 讓開。 （摩根彈了一下手指，箱子開始浮在半空中。） | 真的很帥
+376 | 6143 | 真的，只是些軟弱又如碎屑般的記憶。 也是會妨礙我的感情。 | 那時的你，現在的你，都很珍貴。
+377 | 6152 | 理由很明顯吧？是梅林對我下了詛咒。 竟然是直接傷害心臟的詛咒。最糟糕了… 說不定性命堪憂。 | 是和我一樣的詛咒
+378 | 6164 | 這是…我為你做的最後一次體貼。 | 可是你的表情怎麼那樣？
+379 | 6174 | 我的能量不可能變成那種甜滋滋、軟綿綿的棉花糖之類的東西！！！ 這全都是因為你！！！ 這是精靈女王的恥辱！！！絕對不原諒！！！ | 冷靜地接受吧
+380 | 6187 | ……呀！ | 一把抓住摩根的手
+381 | 6199 | 怎麼樣？看起來跟你所想的摩根一樣嗎？ 你也不過是那種工具而已？ | 只要你幸福就沒關係
+382 | 6210 | 還是說，你本來就是那種對誰都笑臉相迎、 輕浮的人？ | 你是我的情人嗎？
+383 | 6220 | 只是好奇才問的。 你們人類應該相當熟悉那種感情。 | 與你在一起的現在
+384 | 6231 | 艾克斯卡利伯的認可？梅林的選擇？事到如今那些我全都不需要。 多虧了這些，我成為了魔女。 梅林不久之後就會後悔的。 | 希望你不要不幸
+385 | 6240 | 卡美洛將消失在歷史之中…… 我要在那片廢墟之上開啟新的時代。 我會成為那個世界的女王。如何。很完美吧？ | 真的完美嗎？
+386 | 6250 | ……我覺得這個差距，不可能追得上。 | 從現在起我要和你對話100次
+387 | 6260 | 怎麼樣？是公平的契約吧？ 這是用我的血寫的魔法契約，違反的話……會有可怕的詛咒喔？ | 是，主人！(蓋章中)
+388 | 6271 | 還有，最重要的是……不管我是什麼模樣…… 都不會離開我身邊的……那種.... | 是我呢
+389 | 6281 | 我非常餓。非常非常餓。 把你純真的靈魂整個吞下去的話……感覺會非常美味。 | (親親 啾！)
+390 | 6292 | 湖總是映照著我的臉。 映在那裡的我的臉總是看起來悲傷或生氣。 知道我所有那些模樣的湖……我真的很討厭。 | 現在笑就可以了
+391 | 6302 | 不。沒什麼。沒有感情的忠誠奴隸……比較容易駕馭。 當作徹底屬於我的人偶來使用。 | 我討厭無法喜歡你
+392 | 6311 | （亞瑟以溫柔的目光，靜靜地凝視了我許久。） | 凝視亞瑟的雙眼。
+393 | 6320 | 呵呵，說不定我就是為了遇見你，才來到這裡的？ | 幸好你來了。
+394 | 6328 | ……你真的、真的…… 不願意跟我一起去卡美洛嗎？ | 亞瑟留下來陪我吧
+395 | 6336 | 你果然還是得和我結婚。 | 好啊！！！！！
+396 | 6345 | 就算我很快就要離開…… 你也會永遠記得我嗎？ | （握住他的手。）
+397 | 6354 | 我希望你也能感受到這份幸福。 我該怎麼做……才能讓你幸福呢？ | 我也覺得，只要在一起就很幸福。
+398 | 6362 | 呵呵……謝謝你。 真乖，真乖…… （亞瑟摸了摸我的頭。） | 一起摸摸頭
+399 | 6370 | 你有沒有夢過我呢？是什麼樣的夢？ | 親親的夢
+400 | 6378 | ……我說真的喔。 對本大人亞瑟來說，沒有什麼是不可能的。 | 那給我威望道具
+401 | 6386 | 我也不會忘記與你的回憶。 因為你對我而言，就是如此特別的人。 | 對我來說，亞瑟也很特別
+402 | 6398 | 好了，繫好了。 這下不會再鬆開了。 因為是我綁的嘛。 | 我也要替你綁！！
+403 | 6407 | 呵呵，知道是什麼嗎？ 要不要猜猜看？ | 比起言語，用行動表示。
+404 | 6420 | 光是想像，就已經覺得很幸福了吧？ 你心中描繪的未來……也和我相似嗎？ | 你複製了我的腦袋嗎？
+405 | 6431 | 乾脆用我的披風把你裹緊，藏起來不讓任何人看見，好不好？ | 吃醋的樣子真可愛
+406 | 6442 | 唉，不能光拿詛咒當作藉口呢。 我甚至想倒轉時間，把那時的自己一劍砍倒。 居然對你說出那麼狠心的話…… | 我要笑你一輩子
+407 | 6450 | 比起必須回到王位這件事， 必須與你分離，才更讓我喘不過氣來。 | 我們會再次相見的
+408 | 6460 | ……嗯？你怎麼了？ | 再靠過來，我就親下去了
+409 | 6470 | 而現在……那份希望，就在我眼前對著我微笑。 這就是所謂的奇蹟嗎？ | 對我來說，這也是奇蹟
+410 | 6480 | 沒關係，因為我知道…… 最後，你終究會回到我的懷裡。 | 你變成熟了呢。（摸摸頭）
+411 | 6489 | 你覺得，什麼適合當作我們關係的信物呢？ 有沒有什麼喜歡的東西？ | 情侶對戒
+412 | 6498 | 你來晚了吧。 你這傢伙，難道以讓人等待為樂嗎？ 既然約好每天都來，就該早一點吧！ | 你想我了嗎？
+413 | 6507 | ……唉……我到底在說些什麼。 忘了吧。 | 你不是背叛者
+414 | 6515 | 你對我說，已經不喜歡我了。 醒來後雖然鬆了口氣，心情卻始終低落…… | 可是，我喜歡你啊？
+415 | 6523 | ……你……到底喜歡我哪裡？ | 出乎意料的可愛
+416 | 6532 | 突然這樣，抱歉…… ……剛才忽然很想握你的手，就握了下去…… 可是不知怎麼的，心臟像快爆炸一樣，實在受不了。 | 要不要也親一下？開玩笑的啦
+417 | 6541 | ……有沒有什麼……更親暱一點的稱呼呢？ 你有想到什麼嗎？ | 我的名字
+418 | 6550 | ……聽見了嗎？ 這是我向梅林借來的《戀愛新手入門》第1冊，步驟一。 快點離我遠一點。 | 可是，我想靠近你耶？
+419 | 6559 | 亞瑟、梅林，還有我。 我們三個之中，誰最接近你的理想型？！ 給我認真回答！ | 蘭斯洛特
+420 | 6568 | 所以，我決定乾脆直接問你。 ……有沒有什麼想從我這裡得到的禮物？ | 你來就夠了
+421 | 6576 | 那你呢，一天會想起我多少次？ 我看不透你的心思，真叫人焦躁。 | 一次
+422 | 6587 | 變成貓也許還能忍，但不能保護你，我就絕對不能接受。 我現在就把它劈了，你退後。 | 沒有這種東西，也沒關係
+423 | 6600 | 我不會再拿詛咒之類的理由當藉口，這全都是我的錯。 請你……原諒我。 你可以一直打我，直到忘掉我所有的黑歷史為止。 | 用親吻教訓他
+424 | 6613 | ……唉，老實告訴我。 除了我以外，還有人喜歡你嗎？ 而你……你也對那個人有意思嗎？ | 你在意嗎？
+425 | 6624 | 你總是讓我變成膽小鬼。 這種時候……到底該怎麼辦？是訓練不夠嗎？ 這份恐懼，我究竟該如何克服？ | 描繪和我共同的未來
+426 | 6636 | （蘭斯洛特小心翼翼地替跑者整理頭髮。 蘭斯洛特的臉一下子變得通紅！） | 故意把頭髮弄得更亂
+427 | 6647 | （蘭斯洛特有點低落。 想送他一份禮物……送什麼比較好呢？） | 充滿回憶的照片
+428 | 6661 | 怎麼樣？很完美吧？ 這是毫不拖泥帶水的最佳行程。 咳，希望你……也會喜歡。 | 我們去賞花，好不好？
+429 | 6673 | （……路人早已走遠，蘭斯洛特卻仍然將跑者抱在懷裡。） | 你想抱我嗎？
+430 | 6685 | 好了，快點答應我。 不然，我恐怕會不安得無法離開。 | 勾起小指
+431 | 6697 | 分別之前，我一定想讓你嚐嚐我的手藝。 ……而且，廚房也剛好還有剩下的食材。咳。 雖然不知道合不合你的胃口……還是嚐嚐吧。 | 流下感動的眼淚
+432 | 6708 | 跑者…… 可以摸摸我的頭嗎？ | （摸摸頭）
+433 | 6717 | （！！！梅林的書中突然迸射出光芒！！） | 以命運之線締結的契約！
+434 | 6725 | 把童話王國搬到卡美洛城旁邊！ 怎麼樣？這樣就算我們回了故鄉，也能一直相伴！ | 你果然是天才
+435 | 6733 | 我、亞瑟和蘭斯洛特一起掉進水裡，你會先救誰？ | 當然是你啊
+436 | 6741 | 如果你真的、真的喜歡我…… 你能怎麼證明呢？ | （親吻梅林的手背）
+437 | 6751 | 告訴我吧！ 跑者喜歡什麼類型？ 我會試著往那個方向靠近！ | 就是你
+438 | 6760 | 跑者…… 唱首搖籃曲給我聽吧。 | 來，睡吧，我的小寶貝……
+439 | 6768 | 我是說，等待跑者的時間。 我是不是，果然該去學學加快時間的魔法？ | 那麼，分別的時刻也會更快到來
+440 | 6777 | 呵呵，如果我們真的不回去…… 就是為了你我的幸福，捨棄整個世界！嘿嘿！ | 我尊重你的選擇
+441 | 6785 | 夢裡，我和你一起在巧克力泳池游泳， 還騎著小狗環遊世界！ | 我也經常夢到梅林！
+442 | 6794 | （梅林笑咪咪地張開雙臂！） | 沒有更有效的方法嗎？
+443 | 6806 | 快點，摸摸我。 從頭到腳，好好誇獎我乖乖等著你。 誇完之後，還要對我笑喔。 | 原來梅林是小寶寶啊
+444 | 6815 | 內容我早就全知道了。 老套、催眠，完全提不起興趣。 | 那麼，你對我有興趣？
+445 | 6825 | （梅林把跑者拉過來，藏到自己身後！！） | 不可以！！！！！！！（敲額頭）
+446 | 6836 | 所以，你怎麼回答的？ 可要好好回答喔。 | 我說，自己心裡只有梅林
+447 | 6836 | 所以，你怎麼回答的？ 可要好好回答喔。 | 我說，梅林最棒了
+448 | 6836 | 所以，你怎麼回答的？ 可要好好回答喔。 | 我說，我愛梅林
+449 | 6849 | 好開心……我終於確信了。 不管發生什麼事，跑者都一定會選擇我…… | 不管幾次，我都會讓你確認
+450 | 6861 | 噴上它之後，就算你不在身邊，是不是也能覺得，我們一直在一起呢？ | 也幫我噴
+451 | 6871 | 牠又不會魔法，比我笨，甚至比我弱耶！！ | 你可愛多了
+452 | 6880 | 在卡美洛附近，蓋一座只屬於我們的魔法塔，裡面要有每天都能烤出蛋糕的廚房， 還有陽光充足的臥室與書房。 不是很完美嗎？ | 也請準備能跑步的運動場
+453 | 6889 | 鏘鏘！禮物就是我，梅林本人！！ | 這是最棒的禮物
+454 | 6899 | 怎麼樣，喜歡嗎？ | 這是你親手做的嗎？
+455 | 6910 | 很遺憾，我不准。 如果工作那麼重要，就跪下來求我啊。 | 我很快回來，等我一下。
+456 | 6919 | （摩根不安地移開視線，左看右看， 最後還是忍不住，猛地別開了頭！） | 因為你漂亮，才看你
+457 | 6930 | ……你、你該不會有什麼奇怪的嗜好吧？ 還是說……從、從一開始，你就…… 喜歡我……？ | 只是順著自己的心意行動
+458 | 6941 | ……咳，咳。 ……特、特別准許你。 | 付諸行動。
+459 | 6952 | ……我想知道，你的理想型。 | 摩根樂佩
+460 | 6961 | ……不要讓我，一個人回去…… | 默默摸摸她的頭
+461 | 6970 | 全都燒掉吧，用你的手。 | 替她燒掉
+462 | 6981 | 那時候……我不知道自己該怎麼辦。 你越是靠近，我的心跳就越不對勁…… 所以，才故意表現得更兇。對不起…… | 用親吻道歉
+463 | 6990 | 當然要想！！！無論如何都得想！！ 這不是問題，是命令，也是確認！！！ 每天24小時，都只能想著我，知道嗎？！ | 我已經一直在想了啊？
+464 | 7002 | 笨蛋！！奴隸！！不准死！！！ 你怎麼可以，擅自先走掉！！！ | 我怎麼可能丟下你去死
+465 | 7013 | ………… （摩根正以銳利的目光，緊盯著跑者， 監視著表情有沒有任何變化。） | 這種事，有什麼好笑的？
+466 | 7024 | 很可怕吧？ 是不是，現在就想逃走？ | 這是天堂
+467 | 7035 | （……雖然嘴上這麼說，摩根卻有點緊張。） （我想向摩根要的是……） | 對我說，你愛我
+468 | 7047 | 嘴巴都笑得合不攏了呢？ 看來，比起和我喝下午茶，那邊更有趣囉？ | 就算和騎士們在一起，我也只想著你
+    </script>
+
+    <!-- 應用程式核心邏輯 -->
+    <script>
+        // 初始化 Lucide 圖示
+        lucide.createIcons();
+
+        // =======================
+        // 1. 題庫解析與正規化處理
+        // =======================
+        let dialogueDatabase = []; // 儲存整合後的題庫項目
+
+        // 移除標點符號與空白，保留中文字、英數以便高容錯比對
+        function normalizeText(str) {
+            if (!str) return '';
+            return str
+                .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '')
+                .toLowerCase();
+        }
+
+        // 解析具有 '|' 分隔的 data.txt 格式，並將同一個問題/Num 的多重最佳選項合併顯示
+        function parseDatabaseText(rawText) {
+            const lines = rawText.split(/\r?\n/);
+            const groupedMap = new Map();
+            let rawRowCount = 0;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+
+                const parts = line.split('|').map(s => s.trim());
+                // 略過標題列
+                if (parts.length < 3 || parts[1] === 'Num' || isNaN(parseInt(parts[0], 10))) {
+                    continue;
+                }
+
+                let indexId, numId, question, bestOption;
+                if (parts.length >= 5) {
+                    // 若包含 NPC 欄位: 序號 | Num | NPC | 問題 | 最佳選項
+                    indexId = parts[0];
+                    numId = parts[1];
+                    question = parts[3];
+                    bestOption = parts[4];
+                } else {
+                    // 4 欄格式: 序號 | Num | 問題 | 最佳選項
+                    indexId = parts[0];
+                    numId = parts[1];
+                    question = parts[2];
+                    bestOption = parts[3];
+                }
+
+                if (!question || !bestOption) continue;
+                rawRowCount++;
+
+                const normQ = normalizeText(question);
+                const groupKey = `${numId}_${normQ}`;
+
+                if (groupedMap.has(groupKey)) {
+                    const existing = groupedMap.get(groupKey);
+                    if (!existing.options.includes(bestOption)) {
+                        existing.options.push(bestOption);
+                    }
+                } else {
+                    groupedMap.set(groupKey, {
+                        index: indexId,
+                        num: numId,
+                        question: question,
+                        normQuestion: normQ,
+                        options: [bestOption]
+                    });
+                }
+            }
+
+            dialogueDatabase = Array.from(groupedMap.values());
+            document.getElementById('dbCountBadge').innerHTML = `
+                <i data-lucide="database" class="w-3.5 h-3.5"></i>
+                <span>已載入 ${rawRowCount} 筆題庫</span>
+            `;
+            lucide.createIcons();
+            renderDatabaseTable('');
+        }
+
+        // =======================
+        // 2. 模糊文字比對演算法
+        // =======================
+        // 計算 Levenshtein 編輯距離
+        function levenshteinDistance(a, b) {
+            const m = a.length;
+            const n = b.length;
+            if (m === 0) return n;
+            if (n === 0) return m;
+
+            const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+            for (let i = 0; i <= m; i++) dp[i][0] = i;
+            for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j] + 1,      // 刪除
+                        dp[i][j - 1] + 1,      // 插入
+                        dp[i - 1][j - 1] + cost // 替換
+                    );
+                }
+            }
+            return dp[m][n];
+        }
+
+        // 計算最長公共子序列 (LCS) 長度，抵抗 OCR 漏字或插入雜訊
+        function lcsLength(a, b) {
+            const m = a.length;
+            const n = b.length;
+            const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (a[i - 1] === b[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+            return dp[m][n];
+        }
+
+        // 綜合相似度評分 (0 ~ 100)
+        function computeSimilarity(queryRaw, item) {
+            const q = normalizeText(queryRaw);
+            const target = item.normQuestion;
+
+            // 若使用者直接輸入 Num 編號也可精準匹配
+            if (queryRaw.trim() === item.num) return 100;
+
+            if (!q || !target) return 0;
+            if (q === target) return 100;
+
+            // 子字串完全包含加分 (例如只框選到後半句對話)
+            if (target.includes(q)) {
+                const coverage = q.length / target.length;
+                return Math.round(82 + coverage * 18);
+            }
+            if (q.includes(target)) {
+                const coverage = target.length / q.length;
+                return Math.round(80 + coverage * 18);
+            }
+
+            // 計算字元集合交集與 LCS 及編輯距離
+            const lcs = lcsLength(q, target);
+            const minLen = Math.min(q.length, target.length);
+            const maxLen = Math.max(q.length, target.length);
+
+            const lcsRatioMin = lcs / minLen; // 針對局部框選
+            const lcsRatioMax = lcs / maxLen; // 針對完整句子
+
+            const dist = levenshteinDistance(q, target);
+            const editSim = Math.max(0, 1 - dist / maxLen);
+
+            // Bigram (雙字詞) 重疊率
+            let bigramMatches = 0;
+            if (q.length >= 2 && target.length >= 2) {
+                const targetBigrams = new Set();
+                for (let i = 0; i < target.length - 1; i++) {
+                    targetBigrams.add(target.slice(i, i + 2));
+                }
+                let qBigramCount = 0;
+                for (let i = 0; i < q.length - 1; i++) {
+                    qBigramCount++;
+                    if (targetBigrams.has(q.slice(i, i + 2))) {
+                        bigramMatches++;
+                    }
+                }
+                var bigramScore = bigramMatches / qBigramCount;
+            } else {
+                var bigramScore = lcsRatioMin;
+            }
+
+            const combined = (lcsRatioMin * 0.40) + (bigramScore * 0.35) + (editSim * 0.15) + (lcsRatioMax * 0.10);
+            return Math.min(99, Math.round(combined * 100));
+        }
+
+        // 執行搜尋並更新右側 UI
+        function searchBestOptions(queryText) {
+            const cleanPreview = document.getElementById('CleanedQueryPreview');
+            const normQ = normalizeText(queryText);
+            cleanPreview.textContent = normQ ? `有效比對字元：${normQ}` : '';
+
+            if (!queryText || !queryText.trim()) {
+                renderDefaultMatchState();
+                return;
+            }
+
+            const scoredList = dialogueDatabase.map(item => ({
+                item,
+                score: computeSimilarity(queryText, item)
+            }));
+
+            scoredList.sort((a, b) => b.score - a.score);
+            const topMatches = scoredList.slice(0, 5);
+
+            if (topMatches.length > 0 && topMatches[0].score > 0) {
+                updateHeroMatchCard(topMatches[0].item, topMatches[0].score);
+            } else {
+                renderNoMatchState();
+            }
+
+            renderCandidatesList(topMatches);
+        }
+
+        function updateHeroMatchCard(item, score) {
+            document.getElementById('bestMatchNumBadge').textContent = `Num: ${item.num} (#${item.index})`;
+            const scoreBadge = document.getElementById('bestMatchScoreBadge');
+            scoreBadge.textContent = `相似度 ${score}%`;
+
+            if (score >= 75) {
+                scoreBadge.className = 'px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40';
+            } else if (score >= 45) {
+                scoreBadge.className = 'px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40';
+            } else {
+                scoreBadge.className = 'px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/40';
+            }
+
+            document.getElementById('bestMatchQuestion').textContent = item.question;
+
+            const answerContainer = document.getElementById('bestMatchAnswerContainer');
+            if (item.options.length === 1) {
+                answerContainer.innerHTML = `<div class="flex items-center gap-2"><span>${escapeHtml(item.options[0])}</span></div>`;
+                answerContainer.dataset.copyText = item.options[0];
+            } else {
+                // 處理如 Num 6836 有 3 個最佳回答的情況
+                answerContainer.innerHTML = `
+                    <div class="text-xs font-normal text-emerald-400/90 mb-2">此題有 ${item.options.length} 個最佳選項皆可選擇：</div>
+                    <div class="space-y-2">
+                        ${item.options.map((opt, idx) => `
+                            <div class="bg-slate-900/80 border border-emerald-500/40 rounded-lg px-3 py-2 text-lg text-emerald-200 flex items-center justify-between">
+                                <span>${idx + 1}. ${escapeHtml(opt)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                answerContainer.dataset.copyText = item.options.join(' / ');
+            }
+        }
+
+        function renderDefaultMatchState() {
+            document.getElementById('bestMatchNumBadge').textContent = 'Num: ----';
+            document.getElementById('bestMatchScoreBadge').textContent = '等待輸入';
+            document.getElementById('bestMatchQuestion').textContent = '請在左側框選遊戲對話畫面並點擊「立即辨識」，或直接在下方輸入文字查詢。';
+            const answerContainer = document.getElementById('bestMatchAnswerContainer');
+            answerContainer.textContent = '等待辨識或輸入...';
+            answerContainer.dataset.copyText = '';
+
+            // 預設顯示前 5 筆作為範例
+            const sampleMatches = dialogueDatabase.slice(0, 5).map(item => ({ item, score: 100 }));
+            renderCandidatesList(sampleMatches, true);
+        }
+
+        function renderNoMatchState() {
+            document.getElementById('bestMatchNumBadge').textContent = '無相符結果';
+            document.getElementById('bestMatchScoreBadge').textContent = '相似度 0%';
+            document.getElementById('bestMatchQuestion').textContent = '找不到相符的 NPC 問題，請嘗試調整框選範圍、更換影像濾鏡，或手動輸入關鍵字。';
+            const answerContainer = document.getElementById('bestMatchAnswerContainer');
+            answerContainer.textContent = '查無對應選項';
+            answerContainer.dataset.copyText = '';
+        }
+
+        function renderCandidatesList(matches, isDefaultSample = false) {
+            const container = document.getElementById('candidatesList');
+            container.innerHTML = matches.map((entry, idx) => {
+                const { item, score } = entry;
+                const isTop = idx === 0 && !isDefaultSample;
+                const badgeColor = score >= 75 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                    : score >= 45 ? 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                    : 'text-slate-400 bg-slate-800 border-slate-700';
+
+                return `
+                    <div data-index="${idx}" class="candidate-row p-3 rounded-xl border ${isTop ? 'bg-emerald-950/30 border-emerald-500/50' : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'} cursor-pointer transition">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="text-xs font-mono text-slate-400">Num: ${item.num}</span>
+                            <span class="px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeColor}">
+                                ${isDefaultSample ? '題庫範例' : `相似度 ${score}%`}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-300 line-clamp-2 mb-1.5">${escapeHtml(item.question)}</p>
+                        <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <i data-lucide="corner-down-right" class="w-3.5 h-3.5 shrink-0"></i>
+                            <span class="truncate">${escapeHtml(item.options.join(' ／ '))}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+
+            // 點擊候選列可將其切換至主結果區
+            container.querySelectorAll('.candidate-row').forEach((row, idx) => {
+                row.addEventListener('click', () => {
+                    const chosen = matches[idx];
+                    if (chosen) {
+                        updateHeroMatchCard(chosen.item, chosen.score);
+                    }
+                });
+            });
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // =======================
+        // 3. 畫面擷取、圖片載入與方框 ROI 互動
+        // =======================
+        const videoEl = document.getElementById('captureVideo');
+        const sourceCanvas = document.getElementById('sourceCanvas');
+        const sourceCtx = sourceCanvas.getContext('2d');
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        const overlayCtx = overlayCanvas.getContext('2d');
+        const roiPreviewCanvas = document.getElementById('roiPreviewCanvas');
+        const roiPreviewCtx = roiPreviewCanvas.getContext('2d');
+        const workspaceContainer = document.getElementById('workspaceContainer');
+        const emptyWorkspaceHint = document.getElementById('emptyWorkspaceHint');
+
+        let mediaStream = null;
+        let currentSourceMode = 'none'; // 'video' | 'image' | 'demo'
+        let loadedStaticImage = null;
+        let animationFrameId = null;
+
+        // ROI 方框範圍狀態 (相對於 sourceCanvas 內部像素座標)
+        let roiBox = { x: 80, y: 220, w: 640, h: 140 };
+        let isDraggingRoi = false;
+        let dragStartPos = { x: 0, y: 0 };
+
+        // 同步 Overlay Canvas 的顯示位置與尺寸以完全貼合 sourceCanvas
+        function syncOverlayGeometry() {
+            if (!sourceCanvas.width || !sourceCanvas.height) return;
+            const rect = sourceCanvas.getBoundingClientRect();
+            const parentRect = workspaceContainer.getBoundingClientRect();
+
+            overlayCanvas.style.width = `${rect.width}px`;
+            overlayCanvas.style.height = `${rect.height}px`;
+            overlayCanvas.style.left = `${rect.left - parentRect.left}px`;
+            overlayCanvas.style.top = `${rect.top - parentRect.top}px`;
+            overlayCanvas.width = sourceCanvas.width;
+            overlayCanvas.height = sourceCanvas.height;
+
+            drawRoiOverlay();
+        }
+
+        window.addEventListener('resize', syncOverlayGeometry);
+
+        // 繪製半透明遮罩與鮮明方框
+        function drawRoiOverlay() {
+            const w = overlayCanvas.width;
+            const h = overlayCanvas.height;
+            if (!w || !h) return;
+
+            overlayCtx.clearRect(0, 0, w, h);
+
+            // 四周暗角遮罩，突顯選取方框
+            overlayCtx.fillStyle = 'rgba(2, 6, 23, 0.55)';
+            overlayCtx.fillRect(0, 0, w, h);
+
+            // 挖空 ROI 區域
+            overlayCtx.clearRect(roiBox.x, roiBox.y, roiBox.w, roiBox.h);
+
+            // 繪製方框外框
+            overlayCtx.strokeStyle = '#10b981';
+            overlayCtx.lineWidth = Math.max(2, Math.round(w / 320));
+            overlayCtx.strokeRect(roiBox.x, roiBox.y, roiBox.w, roiBox.h);
+
+            // 繪製四個角落控制點
+            const cornerSize = Math.max(8, Math.round(w / 90));
+            overlayCtx.fillStyle = '#34d399';
+            // 左上、右上、左下、右下
+            overlayCtx.fillRect(roiBox.x - cornerSize / 2, roiBox.y - cornerSize / 2, cornerSize, cornerSize);
+            overlayCtx.fillRect(roiBox.x + roiBox.w - cornerSize / 2, roiBox.y - cornerSize / 2, cornerSize, cornerSize);
+            overlayCtx.fillRect(roiBox.x - cornerSize / 2, roiBox.y + roiBox.h - cornerSize / 2, cornerSize, cornerSize);
+            overlayCtx.fillRect(roiBox.x + roiBox.w - cornerSize / 2, roiBox.y + roiBox.h - cornerSize / 2, cornerSize, cornerSize);
+
+            document.getElementById('roiDimensionsBadge').textContent = `${Math.round(roiBox.w)} × ${Math.round(roiBox.h)} px`;
+            updateRoiPreview();
+        }
+
+        // 將 ROI 區域擷取至下方預覽 Canvas 並套用影像強化濾鏡
+        function updateRoiPreview() {
+            if (!sourceCanvas.width || roiBox.w < 5 || roiBox.h < 5) return;
+
+            const rw = Math.max(1, Math.round(roiBox.w));
+            const rh = Math.max(1, Math.round(roiBox.h));
+            roiPreviewCanvas.width = rw;
+            roiPreviewCanvas.height = rh;
+
+            roiPreviewCtx.drawImage(
+                sourceCanvas,
+                Math.round(roiBox.x), Math.round(roiBox.y), rw, rh,
+                0, 0, rw, rh
+            );
+
+            const filterMode = document.getElementById('imageFilterSelect').value;
+            if (filterMode !== 'none') {
+                const threshold = parseInt(document.getElementById('thresholdSlider').value, 10);
+                const imgData = roiPreviewCtx.getImageData(0, 0, rw, rh);
+                const data = imgData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    // 標準人眼亮度權重
+                    let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                    if (filterMode === 'grayscale') {
+                        // 強化對比灰階
+                        gray = gray > threshold ? Math.min(255, gray * 1.2) : Math.max(0, gray * 0.75);
+                    } else if (filterMode === 'invert') {
+                        // 反相 (將深底淺字轉為白底黑字，Tesseract 辨識率大幅提升)
+                        gray = 255 - gray;
+                        gray = gray > threshold ? 255 : Math.max(0, gray * 0.6);
+                    } else if (filterMode === 'binary') {
+                        // 二值化黑白
+                        gray = gray >= threshold ? 255 : 0;
+                    }
+
+                    data[i] = data[i + 1] = data[i + 2] = gray;
+                }
+                roiPreviewCtx.putImageData(imgData, 0, 0);
+            }
+        }
+
+        // 將滑鼠/觸控事件轉換為 Canvas 內部像素座標
+        function getCanvasRelativeCoords(clientX, clientY) {
+            const rect = overlayCanvas.getBoundingClientRect();
+            const scaleX = overlayCanvas.width / rect.width;
+            const scaleY = overlayCanvas.height / rect.height;
+            return {
+                x: Math.max(0, Math.min(overlayCanvas.width, (clientX - rect.left) * scaleX)),
+                y: Math.max(0, Math.min(overlayCanvas.height, (clientY - rect.top) * scaleY))
+            };
+        }
+
+        // 滑鼠與觸控拖曳畫框事件
+        function startRoiDrag(clientX, clientY) {
+            if (!sourceCanvas.width) return;
+            isDraggingRoi = true;
+            dragStartPos = getCanvasRelativeCoords(clientX, clientY);
+        }
+
+        function moveRoiDrag(clientX, clientY) {
+            if (!isDraggingRoi) return;
+            const curr = getCanvasRelativeCoords(clientX, clientY);
+            const x = Math.min(dragStartPos.x, curr.x);
+            const y = Math.min(dragStartPos.y, curr.y);
+            const w = Math.max(20, Math.abs(curr.x - dragStartPos.x));
+            const h = Math.max(20, Math.abs(curr.y - dragStartPos.y));
+
+            roiBox = { x, y, w, h };
+            drawRoiOverlay();
+        }
+
+        function endRoiDrag() {
+            if (!isDraggingRoi) return;
+            isDraggingRoi = false;
+            document.getElementById('roiStatusText').textContent = `已框選範圍 (${Math.round(roiBox.w)}×${Math.round(roiBox.h)}) — 點擊下方「立即辨識框選畫面」即可自動比對最佳選項。`;
+        }
+
+        overlayCanvas.addEventListener('mousedown', e => startRoiDrag(e.clientX, e.clientY));
+        window.addEventListener('mousemove', e => moveRoiDrag(e.clientX, e.clientY));
+        window.addEventListener('mouseup', () => endRoiDrag());
+
+        overlayCanvas.addEventListener('touchstart', e => {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                startRoiDrag(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+        window.addEventListener('touchmove', e => {
+            if (isDraggingRoi && e.touches.length === 1) {
+                moveRoiDrag(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+        window.addEventListener('touchend', () => endRoiDrag());
+
+        // 全選畫面範圍按鈕
+        document.getElementById('selectFullRoiBtn').addEventListener('click', () => {
+            if (!sourceCanvas.width) return;
+            roiBox = { x: 10, y: 10, w: sourceCanvas.width - 20, h: sourceCanvas.height - 20 };
+            drawRoiOverlay();
+        });
+
+        // 濾鏡變更時即時更新預覽
+        document.getElementById('imageFilterSelect').addEventListener('change', updateRoiPreview);
+        document.getElementById('thresholdSlider').addEventListener('input', e => {
+            document.getElementById('thresholdValLabel').textContent = e.target.value;
+            updateRoiPreview();
+        });
+
+        // =======================
+        // 4. 視窗擷取串流、圖片上傳與範例畫面產生器
+        // =======================
+        async function startScreenCapture() {
+            try {
+                if (mediaStream) stopScreenCapture();
+                mediaStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: 'never' },
+                    audio: false
+                });
+                videoEl.srcObject = mediaStream;
+                await videoEl.play();
+
+                currentSourceMode = 'video';
+                emptyWorkspaceHint.classList.add('hidden');
+                document.getElementById('stopCaptureBtn').classList.remove('hidden');
+
+                sourceCanvas.width = videoEl.videoWidth || 1280;
+                sourceCanvas.height = videoEl.videoHeight || 720;
+
+                // 預設框選畫面偏下方的對話框區域
+                roiBox = {
+                    x: Math.round(sourceCanvas.width * 0.12),
+                    y: Math.round(sourceCanvas.height * 0.65),
+                    w: Math.round(sourceCanvas.width * 0.76),
+                    h: Math.round(sourceCanvas.height * 0.22)
+                };
+
+                syncOverlayGeometry();
+
+                mediaStream.getVideoTracks()[0].addEventListener('ended', () => {
+                    stopScreenCapture();
+                });
+
+                renderVideoLoop();
+            } catch (err) {
+                console.warn('Screen capture cancelled or blocked:', err);
+                document.getElementById('roiStatusText').textContent = '無法啟動視窗擷取（可能已取消或受瀏覽器權限限制），您可以使用「上傳截圖」、「Ctrl+V 貼上圖片」或「載入測試範例畫面」。';
+            }
+        }
+
+        function stopScreenCapture() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(t => t.stop());
+                mediaStream = null;
+            }
+            document.getElementById('stopCaptureBtn').classList.add('hidden');
+            if (currentSourceMode === 'video') {
+                currentSourceMode = 'none';
+            }
+        }
+
+        function renderVideoLoop() {
+            if (currentSourceMode !== 'video' || !mediaStream) return;
+            if (videoEl.readyState >= 2) {
+                if (sourceCanvas.width !== videoEl.videoWidth || sourceCanvas.height !== videoEl.videoHeight) {
+                    sourceCanvas.width = videoEl.videoWidth;
+                    sourceCanvas.height = videoEl.videoHeight;
+                    syncOverlayGeometry();
+                }
+                sourceCtx.drawImage(videoEl, 0, 0, sourceCanvas.width, sourceCanvas.height);
+                updateRoiPreview();
+            }
+            animationFrameId = requestAnimationFrame(renderVideoLoop);
+        }
+
+        document.getElementById('startCaptureBtn').addEventListener('click', startScreenCapture);
+        document.getElementById('stopCaptureBtn').addEventListener('click', stopScreenCapture);
+
+        // 載入靜態圖片 (上傳或剪貼簿貼上)
+        function loadStaticImageToWorkspace(imgElement) {
+            stopScreenCapture();
+            currentSourceMode = 'image';
+            loadedStaticImage = imgElement;
+            emptyWorkspaceHint.classList.add('hidden');
+
+            sourceCanvas.width = imgElement.naturalWidth || imgElement.width;
+            sourceCanvas.height = imgElement.naturalHeight || imgElement.height;
+            sourceCtx.drawImage(imgElement, 0, 0);
+
+            roiBox = {
+                x: Math.round(sourceCanvas.width * 0.1),
+                y: Math.round(sourceCanvas.height * 0.6),
+                w: Math.round(sourceCanvas.width * 0.8),
+                h: Math.round(sourceCanvas.height * 0.28)
+            };
+
+            setTimeout(syncOverlayGeometry, 30);
+        }
+
+        document.getElementById('uploadImageInput').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = evt => {
+                const img = new Image();
+                img.onload = () => loadStaticImageToWorkspace(img);
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 支援 Ctrl+V 直接貼上截圖
+        window.addEventListener('paste', e => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    const url = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => {
+                        loadStaticImageToWorkspace(img);
+                        URL.revokeObjectURL(url);
+                    };
+                    img.src = url;
+                    break;
+                }
+            }
+        });
+
+        // 測試範例畫面產生器：從 467 題隨機挑選一題繪製成逼真的遊戲對話框畫面
+        function generateDemoGameScreen() {
+            stopScreenCapture();
+            currentSourceMode = 'demo';
+            emptyWorkspaceHint.classList.add('hidden');
+
+            const w = 960;
+            const h = 540;
+            sourceCanvas.width = w;
+            sourceCanvas.height = h;
+
+            // 隨機挑選一題
+            const randomItem = dialogueDatabase[Math.floor(Math.random() * dialogueDatabase.length)];
+
+            // 1. 繪製奇幻遊戲背景漸層
+            const bgGrad = sourceCtx.createLinearGradient(0, 0, 0, h);
+            bgGrad.addColorStop(0, '#0f172a');
+            bgGrad.addColorStop(0.6, '#1e1b4b');
+            bgGrad.addColorStop(1, '#090d16');
+            sourceCtx.fillStyle = bgGrad;
+            sourceCtx.fillRect(0, 0, w, h);
+
+            // 繪製裝飾光暈與城堡剪影感
+            sourceCtx.fillStyle = 'rgba(56, 189, 248, 0.08)';
+            sourceCtx.beginPath();
+            sourceCtx.arc(w * 0.75, h * 0.3, 140, 0, Math.PI * 2);
+            sourceCtx.fill();
+
+            // 頂部狀態列提示
+            sourceCtx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            sourceCtx.fillRect(24, 20, 340, 38);
+            sourceCtx.fillStyle = '#94a3b8';
+            sourceCtx.font = '15px "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+            sourceCtx.fillText(`【模擬遊戲畫面】題號 Num: ${randomItem.num}`, 38, 44);
+
+            // 2. 繪製下方遊戲 NPC 對話框 (白底黑字高清晰度，方便測試 OCR)
+            const boxX = 70;
+            const boxY = 330;
+            const boxW = 820;
+            const boxH = 165;
+
+            // 對話框陰影與外框
+            sourceCtx.fillStyle = '#f8fafc';
+            sourceCtx.strokeStyle = '#10b981';
+            sourceCtx.lineWidth = 4;
+            sourceCtx.beginPath();
+            sourceCtx.roundRect(boxX, boxY, boxW, boxH, 16);
+            sourceCtx.fill();
+            sourceCtx.stroke();
+
+            // NPC 名稱標籤
+            sourceCtx.fillStyle = '#0f172a';
+            sourceCtx.beginPath();
+            sourceCtx.roundRect(boxX + 24, boxY - 22, 160, 38, 10);
+            sourceCtx.fill();
+            sourceCtx.fillStyle = '#34d399';
+            sourceCtx.font = 'bold 18px "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+            sourceCtx.fillText('卡美洛騎士對話', boxX + 40, boxY + 3);
+
+            // 繪製問題文字 (自動換行)
+            sourceCtx.fillStyle = '#0f172a';
+            sourceCtx.font = 'bold 25px "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+            const textX = boxX + 36;
+            let textY = boxY + 62;
+            const maxLineWidth = boxW - 72;
+
+            let line = '';
+            for (const ch of randomItem.question) {
+                const testLine = line + ch;
+                if (sourceCtx.measureText(testLine).width > maxLineWidth) {
+                    sourceCtx.fillText(line, textX, textY);
+                    line = ch;
+                    textY += 38;
+                } else {
+                    line = testLine;
+                }
+            }
+            if (line) {
+                sourceCtx.fillText(line, textX, textY);
+            }
+
+            // 自動將 ROI 框選在對話文字範圍上
+            roiBox = {
+                x: boxX + 18,
+                y: boxY + 24,
+                w: boxW - 36,
+                h: boxH - 36
+            };
+
+            setTimeout(() => {
+                syncOverlayGeometry();
+                document.getElementById('roiStatusText').textContent = `已載入模擬遊戲對話 (Num: ${randomItem.num})，正在自動執行 OCR 文字辨識與比對...`;
+                runOcrRecognition();
+            }, 50);
+        }
+
+        document.getElementById('loadDemoBtn').addEventListener('click', generateDemoGameScreen);
+
+        // =======================
+        // 5. Tesseract.js 中文 OCR 辨識邏輯
+        // =======================
+        let isOcrRunning = false;
+        let autoOcrTimer = null;
+
+        function setOcrStatus(text, state = 'idle', progress = 0) {
+            const dot = document.getElementById('ocrStatusDot');
+            const label = document.getElementById('ocrStatusText');
+            const bar = document.getElementById('ocrProgressBar');
+
+            label.textContent = text;
+            bar.style.width = `${Math.round(progress * 100)}%`;
+
+            if (state === 'busy') {
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+            } else if (state === 'error') {
+                dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+            } else {
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+            }
+        }
+
+        async function runOcrRecognition() {
+            if (isOcrRunning) return;
+            if (!sourceCanvas.width || roiBox.w < 10 || roiBox.h < 10) {
+                setOcrStatus('請先載入畫面並框選範圍', 'error', 0);
+                return;
+            }
+
+            isOcrRunning = true;
+            updateRoiPreview(); // 確保預覽 Canvas 為最新畫面
+
+            const lang = document.getElementById('ocrLangSelect').value;
+            setOcrStatus('正在初始化並辨識框選文字...', 'busy', 0.15);
+
+            try {
+                const result = await Tesseract.recognize(
+                    roiPreviewCanvas,
+                    lang,
+                    {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                setOcrStatus(`文字辨識中 (${Math.round(m.progress * 100)}%)...`, 'busy', m.progress);
+                            } else if (m.status) {
+                                setOcrStatus(`載入模型: ${m.status}`, 'busy', 0.3);
+                            }
+                        }
+                    }
+                );
+
+                // 清理 OCR 產生的多餘空白與換行
+                const rawText = (result?.data?.text || '')
+                    .replace(/\s+/g, '')
+                    .trim();
+
+                setOcrStatus('辨識完成！已自動對比題庫', 'idle', 1);
+
+                const inputEl = document.getElementById('ocrResultInput');
+                if (rawText) {
+                    inputEl.value = rawText;
+                    searchBestOptions(rawText);
+                } else {
+                    setOcrStatus('未偵測到清晰文字，請調整紅框或切換影像濾鏡', 'error', 0);
+                }
+            } catch (err) {
+                console.error('OCR Error:', err);
+                setOcrStatus('OCR 辨識發生錯誤，請直接於下方手動輸入關鍵字', 'error', 0);
+            } finally {
+                isOcrRunning = false;
+            }
+        }
+
+        document.getElementById('runOcrBtn').addEventListener('click', runOcrRecognition);
+
+        // 空白鍵快捷觸發辨識 (當焦點不在輸入框時)
+        window.addEventListener('keydown', e => {
+            const activeTag = document.activeElement?.tagName?.toLowerCase();
+            if (e.code === 'Space' && activeTag !== 'textarea' && activeTag !== 'input') {
+                e.preventDefault();
+                runOcrRecognition();
+            }
+        });
+
+        // 每 2.5 秒自動連續辨識開關
+        document.getElementById('autoOcrToggle').addEventListener('change', e => {
+            if (e.target.checked) {
+                runOcrRecognition();
+                autoOcrTimer = setInterval(() => {
+                    if (!isOcrRunning && sourceCanvas.width > 0) {
+                        runOcrRecognition();
+                    }
+                }, 2500);
+            } else {
+                if (autoOcrTimer) {
+                    clearInterval(autoOcrTimer);
+                    autoOcrTimer = null;
+                }
+            }
+        });
+
+        // =======================
+        // 6. 手動編輯與複製最佳選項功能
+        // =======================
+        const ocrResultInput = document.getElementById('ocrResultInput');
+        ocrResultInput.addEventListener('input', e => {
+            searchBestOptions(e.target.value);
+        });
+
+        document.getElementById('clearTextBtn').addEventListener('click', () => {
+            ocrResultInput.value = '';
+            searchBestOptions('');
+            ocrResultInput.focus();
+        });
+
+        // 複製最佳選項按鈕 (使用相容於 iframe 的複製方式)
+        document.getElementById('copyBestOptionBtn').addEventListener('click', () => {
+            const textToCopy = document.getElementById('bestMatchAnswerContainer').dataset.copyText;
+            if (!textToCopy) return;
+
+            const tempArea = document.createElement('textarea');
+            tempArea.value = textToCopy;
+            document.body.appendChild(tempArea);
+            tempArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempArea);
+
+            const copyBtnText = document.getElementById('copyBtnText');
+            copyBtnText.textContent = '已複製！';
+            setTimeout(() => {
+                copyBtnText.textContent = '複製選項';
+            }, 1500);
+        });
+
+        // =======================
+        // 7. 題庫瀏覽與自訂匯入 Modal
+        // =======================
+        const dbModal = document.getElementById('dbModal');
+        document.getElementById('openDbModalBtn').addEventListener('click', () => {
+            dbModal.classList.remove('hidden');
+            dbModal.classList.add('flex');
+        });
+        document.getElementById('closeDbModalBtn').addEventListener('click', () => {
+            dbModal.classList.add('hidden');
+            dbModal.classList.remove('flex');
+        });
+
+        function renderDatabaseTable(filterKeyword = '') {
+            const tbody = document.getElementById('dbTableBody');
+            const kw = filterKeyword.trim().toLowerCase();
+
+            const filtered = dialogueDatabase.filter(item => {
+                if (!kw) return true;
+                return (
+                    item.num.toLowerCase().includes(kw) ||
+                    item.question.toLowerCase().includes(kw) ||
+                    item.options.some(o => o.toLowerCase().includes(kw))
+                );
+            });
+
+            tbody.innerHTML = filtered.map(item => `
+                <tr class="hover:bg-slate-800/50 transition cursor-pointer" data-num="${item.num}">
+                    <td class="py-2.5 px-2 text-slate-500 font-mono">${item.index}</td>
+                    <td class="py-2.5 px-2 text-amber-400 font-mono font-semibold">${item.num}</td>
+                    <td class="py-2.5 px-2 text-slate-200">${escapeHtml(item.question)}</td>
+                    <td class="py-2.5 px-2 text-emerald-400 font-bold">${escapeHtml(item.options.join(' ／ '))}</td>
+                </tr>
+            `).join('');
+
+            // 點擊題庫任一列可直接選取並關閉視窗
+            tbody.querySelectorAll('tr').forEach((tr, idx) => {
+                tr.addEventListener('click', () => {
+                    const item = filtered[idx];
+                    if (item) {
+                        ocrResultInput.value = item.question;
+                        searchBestOptions(item.question);
+                        dbModal.classList.add('hidden');
+                        dbModal.classList.remove('flex');
+                    }
+                });
+            });
+        }
+
+        document.getElementById('dbFilterInput').addEventListener('input', e => {
+            renderDatabaseTable(e.target.value);
+        });
+
+        // 匯入自訂 data.txt
+        document.getElementById('importDataFileInput').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = evt => {
+                parseDatabaseText(evt.target.result);
+                searchBestOptions(ocrResultInput.value);
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+
+        // 還原預設 467 筆題庫
+        document.getElementById('resetDefaultDbBtn').addEventListener('click', () => {
+            const rawText = document.getElementById('rawDatabaseText').textContent;
+            parseDatabaseText(rawText);
+            document.getElementById('dbFilterInput').value = '';
+            searchBestOptions(ocrResultInput.value);
+        });
+
+        // 頁面載入時初始化解析 467 筆題庫並顯示預設狀態
+        window.addEventListener('DOMContentLoaded', () => {
+            const rawText = document.getElementById('rawDatabaseText').textContent;
+            parseDatabaseText(rawText);
+            renderDefaultMatchState();
+        });
+    </script>
+</body>
+</html>
